@@ -16,6 +16,9 @@ struct GameObject {
   glm::mat4 model;
 };
 
+//--------- Assets -------------//
+enum class MeshTypes { TRIANGLE, SQUARE, STAR };
+
 /**
  * Scene
  * Procedurally generated Scene data
@@ -25,7 +28,8 @@ class Scene {
 public:
   Scene();
   std::vector<glm::vec3> triangle_positions;
-  // std::vector<glm::vec3> square_positions;
+  std::vector<glm::vec3> square_positions;
+  std::vector<glm::vec3> star_positions;
 };
 
 } // namespace ice

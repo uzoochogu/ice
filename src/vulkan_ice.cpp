@@ -58,7 +58,8 @@ VulkanIce::~VulkanIce() {
 
   device.destroyDescriptorSetLayout(descriptor_set_layout);
 
-  delete triangle_mesh;
+  // delete triangle_mesh;
+  delete meshes;
 
   device.destroy();
 
@@ -325,8 +326,64 @@ void VulkanIce::recreate_swapchain() {
 }
 
 void VulkanIce::make_assets() {
-  triangle_mesh = new TriangleMesh(device, physical_device, graphics_queue,
-                                   main_command_buffer);
+  /* triangle_mesh = new TriangleMesh(device, physical_device, graphics_queue,
+                                   main_command_buffer); */
+
+  // meshes = std::make_unique<MeshCollator>();
+  meshes = new MeshCollator();
+
+  std::vector<Vertex> vertices = {{.pos = glm::vec3(0.0f, -0.05f, 1.0f),
+                                   .color = glm::vec3(0.0f, 1.0f, 0.0f)},
+                                  {.pos = glm::vec3(0.05f, 0.05f, 0.0f),
+                                   .color = glm::vec3(0.0f, 1.0f, 0.0f)},
+                                  {.pos = glm::vec3(-0.05f, 0.05f, 0.0f),
+                                   .color = glm::vec3(0.0f, 1.0f, 0.0f)}};
+  MeshTypes type = MeshTypes::TRIANGLE;
+  meshes->consume(type, vertices);
+
+  vertices = {{.pos = {-0.05f, 0.05f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
+              {.pos = {-0.05f, -0.05f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
+              {.pos = {0.05f, -0.05f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
+              {.pos = {0.05f, -0.05f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
+              {.pos = {0.05f, 0.05f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
+              {.pos = {-0.05f, 0.05f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}}};
+  type = MeshTypes::SQUARE;
+  meshes->consume(type, vertices);
+
+  vertices = {{.pos = {-0.05f, -0.025f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {-0.02f, -0.025f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {-0.03f, 0.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {-0.02f, -0.025f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {0.0f, -0.05f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {0.02f, -0.025f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {-0.03f, 0.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {-0.02f, -0.025f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {0.02f, -0.025f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {0.02f, -0.025f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {0.05f, -0.025f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {0.03f, 0.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {-0.03f, 0.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {0.02f, -0.025f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {0.03f, 0.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {0.03f, 0.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {0.04f, 0.05f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {0.0f, 0.01f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {-0.03f, 0.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {0.03f, 0.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {0.0f, 0.01f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {-0.03f, 0.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {0.0f, 0.01f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
+              {.pos = {-0.04f, 0.05f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}}};
+  type = MeshTypes::STAR;
+  meshes->consume(type, vertices);
+
+  VertexBufferFinalizationInput finalization_info{
+      .logical_device = device,
+      .physical_device = physical_device,
+      .command_buffer = main_command_buffer,
+      .queue = graphics_queue};
+
+  meshes->finalize(finalization_info);
 }
 
 void VulkanIce::prepare_frame(std::uint32_t image_index, Scene *scene) {
@@ -354,6 +411,13 @@ void VulkanIce::prepare_frame(std::uint32_t image_index, Scene *scene) {
   for (glm::vec3 &position : scene->triangle_positions) {
     _frame.model_transforms[i++] = glm::translate(glm::mat4(1.0f), position);
   }
+  for (glm::vec3 &position : scene->square_positions) {
+    _frame.model_transforms[i++] = glm::translate(glm::mat4(1.0f), position);
+  }
+  for (glm::vec3 position : scene->star_positions) {
+    _frame.model_transforms[i++] = glm::translate(glm::mat4(1.0f), position);
+  }
+
   memcpy(_frame.model_buffer_write_location, _frame.model_transforms.data(),
          i * sizeof(glm::mat4));
 
@@ -361,7 +425,7 @@ void VulkanIce::prepare_frame(std::uint32_t image_index, Scene *scene) {
 }
 
 void VulkanIce::prepare_scene(vk::CommandBuffer command_buffer) {
-  vk::Buffer vertex_buffers[] = {triangle_mesh->vertex_buffer.buffer};
+  vk::Buffer vertex_buffers[] = {meshes->vertex_buffer.buffer};
   vk::DeviceSize offsets[] = {0};
   command_buffer.bindVertexBuffers(0, 1, vertex_buffers, offsets);
 }
@@ -496,11 +560,29 @@ void VulkanIce::record_draw_commands(vk::CommandBuffer command_buffer,
   prepare_scene(command_buffer);
 
   // instancing
-  std::uint32_t vertex_count = triangle_mesh->get_vertex_count();
-  std::uint32_t first_vertex = 0;
+  // Triangles
+  std::uint32_t vertex_count = meshes->sizes.find(MeshTypes::TRIANGLE)->second;
+  std::uint32_t first_vertex =
+      meshes->offsets.find(MeshTypes::TRIANGLE)->second;
   uint32_t start_instance = 0;
   uint32_t instance_count =
       static_cast<uint32_t>(scene->triangle_positions.size());
+  command_buffer.draw(vertex_count, instance_count, first_vertex,
+                      start_instance);
+  start_instance += instance_count;
+
+  // squares
+  vertex_count = meshes->sizes.find(MeshTypes::SQUARE)->second;
+  first_vertex = meshes->offsets.find(MeshTypes::SQUARE)->second;
+  instance_count = static_cast<uint32_t>(scene->square_positions.size());
+  command_buffer.draw(vertex_count, instance_count, first_vertex,
+                      start_instance);
+  start_instance += instance_count;
+
+  // stars
+  vertex_count = meshes->sizes.find(MeshTypes::STAR)->second;
+  first_vertex = meshes->offsets.find(MeshTypes::STAR)->second;
+  instance_count = static_cast<uint32_t>(scene->star_positions.size());
   command_buffer.draw(vertex_count, instance_count, first_vertex,
                       start_instance);
   start_instance += instance_count;

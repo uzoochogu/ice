@@ -7,6 +7,7 @@
 #include "commands.hpp"
 #include "descriptors.hpp"
 #include "framebuffer.hpp"
+#include "mesh_collator.hpp"
 #include "pipeline.hpp"
 #include "swapchain.hpp"
 #include "synchronization.hpp"
@@ -112,7 +113,9 @@ private:
   std::uint32_t max_frames_in_flight{0}, current_frame{0};
 
   // assets pointers
-  TriangleMesh *triangle_mesh;
+  // TriangleMesh *triangle_mesh;
+  // std::unique_ptr<MeshCollator> meshes;
+  MeshCollator *meshes;
 
   // descriptor-related
   vk::DescriptorSetLayout descriptor_set_layout;
