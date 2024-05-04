@@ -27,9 +27,9 @@ struct SwapChainFrame {
   UBO camera_data;
   BufferBundle camera_data_buffer;
   void *camera_data_write_location;
-  std::vector<glm::mat4> model_transforms;
+/*   std::vector<glm::mat4> model_transforms;
   BufferBundle model_buffer;
-  void *model_buffer_write_location;
+  void *model_buffer_write_location; */
 
   // Resource Descriptors
   vk::DescriptorBufferInfo uniform_buffer_descriptor_info;
@@ -55,7 +55,7 @@ struct SwapChainFrame {
         camera_data_buffer.buffer_memory, 0, sizeof(UBO));
 
     // model data
-    constexpr const std::uint32_t INSTANCES = 1024;
+/*     constexpr const std::uint32_t INSTANCES = 1024;
     input.size = INSTANCES * sizeof(glm::mat4);
     input.usage = vk::BufferUsageFlagBits::eStorageBuffer;
     model_buffer = createBuffer(input);
@@ -66,7 +66,7 @@ struct SwapChainFrame {
     model_transforms.reserve(INSTANCES);
     for (std::uint32_t i = 0; i < INSTANCES; ++i) {
       model_transforms.push_back(glm::mat4(1.0f));
-    }
+    } */
 
     /*
     typedef struct VkDescriptorBufferInfo {
@@ -78,9 +78,9 @@ struct SwapChainFrame {
     uniform_buffer_descriptor_info = {
         .buffer = camera_data_buffer.buffer, .offset = 0, .range = sizeof(UBO)};
 
-    model_buffer_descriptor_info = {.buffer = model_buffer.buffer,
+    /* model_buffer_descriptor_info = {.buffer = model_buffer.buffer,
                                     .offset = 0,
-                                    .range = INSTANCES * sizeof(glm::mat4)};
+                                    .range = INSTANCES * sizeof(glm::mat4)}; */
   }
 
   void write_descriptor_set(vk::Device device) {
@@ -110,11 +110,11 @@ struct SwapChainFrame {
     device.updateDescriptorSets(write_info, nullptr);
 
     // transforms write info
-    write_info.dstBinding = 1,
+/*     write_info.dstBinding = 1,
     write_info.descriptorType = vk::DescriptorType::eStorageBuffer;
     write_info.pBufferInfo = &model_buffer_descriptor_info;
 
-    device.updateDescriptorSets(write_info, nullptr);
+    device.updateDescriptorSets(write_info, nullptr); */
   }
 };
 

@@ -32,15 +32,15 @@ make_pipeline_layout(const vk::Device &device,
   vk::PipelineLayoutCreateInfo layout_info{
       .setLayoutCount = 1,
       .pSetLayouts = &descriptor_set_layout,
-      .pushConstantRangeCount = 0,
+      .pushConstantRangeCount =  1 /* 0 */,
   };
 
-/*   // create and append push constant range to layout
+  // create and append push constant range to layout
   vk::PushConstantRange push_constant_range{
       .stageFlags = vk::ShaderStageFlagBits::eVertex,
       .offset = 0,
       .size = sizeof(ice::GameObject)};
-  layout_info.pPushConstantRanges = &push_constant_range; */
+  layout_info.pPushConstantRanges = &push_constant_range;
 
   try {
     return device.createPipelineLayout(layout_info);

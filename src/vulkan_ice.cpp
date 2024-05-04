@@ -221,7 +221,7 @@ void VulkanIce::setup_descriptor_set_layout() {
           There is just one binding, it's at binding 0,
           is a single uniform buffer, to be bound to the vertex shader stage.
   */
-  descriptor_set_layout_bindings = {.count = 2};
+  descriptor_set_layout_bindings = {.count = 1 /* 2 */};
   descriptor_set_layout_bindings.indices.push_back(0);
   descriptor_set_layout_bindings.types.push_back(
       vk::DescriptorType::eUniformBuffer);
@@ -230,10 +230,10 @@ void VulkanIce::setup_descriptor_set_layout() {
       vk::ShaderStageFlagBits::eVertex);
 
     
-	descriptor_set_layout_bindings.indices.push_back(1);
+	/* descriptor_set_layout_bindings.indices.push_back(1);
 	descriptor_set_layout_bindings.types.push_back(vk::DescriptorType::eStorageBuffer);
 	descriptor_set_layout_bindings.descriptor_counts.push_back(1);
-	descriptor_set_layout_bindings.stages.push_back(vk::ShaderStageFlagBits::eVertex);  
+	descriptor_set_layout_bindings.stages.push_back(vk::ShaderStageFlagBits::eVertex); */  
 
   descriptor_set_layout =
       make_descriptor_set_layout(device, descriptor_set_layout_bindings);
@@ -349,14 +349,14 @@ void VulkanIce::prepare_frame(std::uint32_t image_index, Scene *scene) {
                         .projection = projection,
                         .view_projection = projection * view};
   memcpy(_frame.camera_data_write_location, &(_frame.camera_data), sizeof(UBO));
-
+/* 
   // model transforms info
   size_t i = 0;
   for (glm::vec3 &position : scene->triangle_positions) {
     _frame.model_transforms[i++] = glm::translate(glm::mat4(1.0f), position);
   }
   memcpy(_frame.model_buffer_write_location, _frame.model_transforms.data(),
-         i * sizeof(glm::mat4));
+         i * sizeof(glm::mat4)); */
 
   _frame.write_descriptor_set(device);
 }
@@ -497,7 +497,7 @@ void VulkanIce::record_draw_commands(vk::CommandBuffer command_buffer,
   prepare_scene(command_buffer);
 
   // Transformations on the model
-  /*   for (glm::vec3 position : scene->triangle_positions) {
+    for (glm::vec3 position : scene->triangle_positions) {
       glm::mat4 model = glm::translate(glm::mat4(1.0f), position);
       ice::GameObject object_data;
       object_data.model = model;
@@ -505,15 +505,15 @@ void VulkanIce::record_draw_commands(vk::CommandBuffer command_buffer,
                                    vk::ShaderStageFlagBits::eVertex, 0,
                                    sizeof(object_data), &object_data);
       command_buffer.draw(3, 1, 0, 0);
-    } */
-  int vertex_count = 18;
+    }
+/*   int vertex_count = 18;
   int first_vertex = 0;
   uint32_t start_instance = 0;
   uint32_t instance_count =
       static_cast<uint32_t>(scene->triangle_positions.size());
   command_buffer.draw(vertex_count, instance_count, first_vertex,
                       start_instance);
-  start_instance += instance_count;
+  start_instance += instance_count; */
 
   command_buffer.endRenderPass();
 
@@ -700,9 +700,9 @@ void VulkanIce::destroy_swapchain_bundle(bool include_swapchain) {
     device.freeMemory(frame.camera_data_buffer.buffer_memory);
     device.destroyBuffer(frame.camera_data_buffer.buffer);
 
-    device.unmapMemory(frame.model_buffer.buffer_memory);
+/*     device.unmapMemory(frame.model_buffer.buffer_memory);
     device.freeMemory(frame.model_buffer.buffer_memory);
-    device.destroyBuffer(frame.model_buffer.buffer);
+    device.destroyBuffer(frame.model_buffer.buffer); */
   }
 
   if (include_swapchain) {
