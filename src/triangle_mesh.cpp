@@ -6,7 +6,7 @@ TriangleMesh::TriangleMesh(const vk::Device logical_device,
 
   this->logical_device = logical_device;
 
-  std::vector<Vertex> vertices = {{.pos = glm::vec3(0.0f, -0.05f, 0.0f),
+  vertices = {{.pos = glm::vec3(0.0f, -0.05f, 0.0f),
                                    .color = glm::vec3(0.0f, 1.0f, 0.0f)},
                                   {.pos = glm::vec3(0.05f, 0.05f, 0.0f),
                                    .color = glm::vec3(0.0f, 1.0f, 0.0f)},
@@ -55,6 +55,10 @@ TriangleMesh::TriangleMesh(const vk::Device logical_device,
     throw std::runtime_error(
         "Vertex copy operation and Triangle mesh creation failed!");
   }
+}
+
+std::uint32_t TriangleMesh::get_vertex_count() const {
+  return static_cast<uint32_t>(vertices.size()); 
 }
 
 TriangleMesh::~TriangleMesh() {

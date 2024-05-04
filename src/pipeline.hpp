@@ -32,15 +32,8 @@ make_pipeline_layout(const vk::Device &device,
   vk::PipelineLayoutCreateInfo layout_info{
       .setLayoutCount = 1,
       .pSetLayouts = &descriptor_set_layout,
-      .pushConstantRangeCount =  1 /* 0 */,
+      .pushConstantRangeCount = 0,
   };
-
-  // create and append push constant range to layout
-  vk::PushConstantRange push_constant_range{
-      .stageFlags = vk::ShaderStageFlagBits::eVertex,
-      .offset = 0,
-      .size = sizeof(ice::GameObject)};
-  layout_info.pPushConstantRanges = &push_constant_range;
 
   try {
     return device.createPipelineLayout(layout_info);
@@ -233,8 +226,8 @@ make_graphics_pipeline(const GraphicsPipelineInBundle &specification) {
   pipeline_info.pDepthStencilState = &depth_stencil_info;
 
   // Pipeline layout
-  vk::PipelineLayout pipeline_layout =
-      make_pipeline_layout(specification.device, specification.descriptor_set_layout);
+  vk::PipelineLayout pipeline_layout = make_pipeline_layout(
+      specification.device, specification.descriptor_set_layout);
   pipeline_info.layout = pipeline_layout;
 
   //  Renderpass

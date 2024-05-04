@@ -17,8 +17,12 @@ public:
   ~TriangleMesh();
   BufferBundle vertex_buffer;
 
+  std::uint32_t get_vertex_count() const;
+  
+
 private:
   vk::Device logical_device;
+  std::vector<Vertex> vertices;
 };
 } // namespace ice
 
