@@ -4,11 +4,11 @@
 #include "game_objects.hpp"
 
 namespace ice {
-	struct UBO {
-		glm::mat4 view;
-		glm::mat4 projection;
-		glm::mat4 view_projection;
-	};
+struct UBO {
+  glm::mat4 view;
+  glm::mat4 projection;
+  glm::mat4 view_projection;
+};
 
-}
+} // namespace ice
 #endif

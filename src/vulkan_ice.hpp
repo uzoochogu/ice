@@ -91,7 +91,7 @@ private:
   void make_assets();
 
   // frame and scene prep
-  void prepare_frame(std::uint32_t image_index, Scene * scene);
+  void prepare_frame(std::uint32_t image_index, Scene *scene);
   void prepare_scene(vk::CommandBuffer command_buffe);
   void record_draw_commands(vk::CommandBuffer command_buffer,
                             uint32_t image_index, Scene *scene);

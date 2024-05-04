@@ -495,6 +495,7 @@ void VulkanIce::record_draw_commands(vk::CommandBuffer command_buffer,
 
   prepare_scene(command_buffer);
 
+  // instancing
   std::uint32_t vertex_count = triangle_mesh->get_vertex_count();
   std::uint32_t first_vertex = 0;
   uint32_t start_instance = 0;

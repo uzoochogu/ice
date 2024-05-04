@@ -50,7 +50,7 @@ struct SwapChainFrame {
         .physical_device = physical_device,
     };
 
-    camera_data_buffer = createBuffer(input);
+    camera_data_buffer = create_buffer(input);
 
     camera_data_write_location = logical_device.mapMemory(
         camera_data_buffer.buffer_memory, 0, sizeof(UBO));
@@ -59,7 +59,7 @@ struct SwapChainFrame {
     constexpr const std::uint32_t INSTANCES = 1024;
     input.size = INSTANCES * sizeof(glm::mat4);
     input.usage = vk::BufferUsageFlagBits::eStorageBuffer;
-    model_buffer = createBuffer(input);
+    model_buffer = create_buffer(input);
 
     model_buffer_write_location = logical_device.mapMemory(
         model_buffer.buffer_memory, 0, INSTANCES * sizeof(glm::mat4));
@@ -91,11 +91,11 @@ struct SwapChainFrame {
     device.updateDescriptorSets(write_info, nullptr);
 
     // transforms write info
-        write_info.dstBinding = 1,
-        write_info.descriptorType = vk::DescriptorType::eStorageBuffer;
-        write_info.pBufferInfo = &model_buffer_descriptor_info;
+    write_info.dstBinding = 1,
+    write_info.descriptorType = vk::DescriptorType::eStorageBuffer;
+    write_info.pBufferInfo = &model_buffer_descriptor_info;
 
-        device.updateDescriptorSets(write_info, nullptr);
+    device.updateDescriptorSets(write_info, nullptr);
   }
 };
 

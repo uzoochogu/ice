@@ -31,7 +31,8 @@ namespace ice {
 // }
 
 // /**
-//         \returns the input attribute descriptions for a (vec2 pos, vec3 color)
+//         \returns the input attribute descriptions for a (vec2 pos, vec3
+//         color)
 //    vertex format.
 // */
 // inline std::array<vk::VertexInputAttributeDescription, 2>
@@ -62,8 +63,6 @@ namespace ice {
 
 //   return attributes;
 // }
-
-
 
 // Vertex data
 // To be used in the vertex shader
@@ -134,6 +133,16 @@ struct Vertex {
         attributeDescriptions[2].format =
             vk::Format::eR32G32Sfloat; // vec2 for texture coordinates
         attributeDescriptions[2].offset = offsetof(Vertex, texCoord); */
+
+#ifndef NDEBUG
+    std::cout << std::format("\nOffsets:\n"
+                             "pos offset:         {}\n"
+                             "color offset:       {}\n"
+                             "texCoord offset:    {}\n\n",
+                             offsetof(Vertex, pos), offsetof(Vertex, color),
+                             2 * offsetof(Vertex, color) -
+                                 offsetof(Vertex, pos));
+#endif
 
     return attributeDescriptions;
   }

@@ -52,7 +52,7 @@ find_memory_type_index(const vk::PhysicalDevice physical_device,
 // Buffer size, memory properties and usage are customizable.
 // \returns a populated Buffer struct (Buffer and Buffer memory)
 // \throws runtime_error is buffer creation fails
-inline BufferBundle createBuffer(const BufferCreationInput &buffer_input) {
+inline BufferBundle create_buffer(const BufferCreationInput &buffer_input) {
   BufferBundle buffer_bundle;
   vk::BufferCreateInfo buffer_info{
       .flags = vk::BufferCreateFlags(),

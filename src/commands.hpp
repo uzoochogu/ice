@@ -30,7 +30,8 @@ inline vk::CommandPool make_command_pool(vk::Device device,
   }
 }
 
-inline vk::CommandBuffer make_command_buffer(const CommandBufferReq& buffer_req) {
+inline vk::CommandBuffer
+make_command_buffer(const CommandBufferReq &buffer_req) {
   vk::CommandBufferAllocateInfo alloc_info{
       .commandPool = buffer_req.command_pool,
       .level = vk::CommandBufferLevel::ePrimary,
@@ -43,8 +44,7 @@ inline vk::CommandBuffer make_command_buffer(const CommandBufferReq& buffer_req)
   }
 }
 
-inline void
-make_frame_command_buffers(const CommandBufferReq& buffer_req) {
+inline void make_frame_command_buffers(const CommandBufferReq &buffer_req) {
   vk::CommandBufferAllocateInfo alloc_info{
       .commandPool = buffer_req.command_pool,
       .level = vk::CommandBufferLevel::ePrimary,

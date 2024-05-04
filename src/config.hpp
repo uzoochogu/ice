@@ -8,8 +8,8 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
-
 
 // Todo, create wrappers ifdef wrappers to give choice in using structs or not
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS

@@ -18,7 +18,6 @@ public:
   BufferBundle vertex_buffer;
 
   std::uint32_t get_vertex_count() const;
-  
 
 private:
   vk::Device logical_device;

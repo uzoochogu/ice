@@ -7,11 +7,11 @@ TriangleMesh::TriangleMesh(const vk::Device logical_device,
   this->logical_device = logical_device;
 
   vertices = {{.pos = glm::vec3(0.0f, -0.05f, 0.0f),
-                                   .color = glm::vec3(0.0f, 1.0f, 0.0f)},
-                                  {.pos = glm::vec3(0.05f, 0.05f, 0.0f),
-                                   .color = glm::vec3(0.0f, 1.0f, 0.0f)},
-                                  {.pos = glm::vec3(-0.05f, 0.05f, 0.0f),
-                                   .color = glm::vec3(0.0f, 1.0f, 0.0f)}};
+               .color = glm::vec3(0.0f, 1.0f, 0.0f)},
+              {.pos = glm::vec3(0.05f, 0.05f, 0.0f),
+               .color = glm::vec3(0.0f, 1.0f, 0.0f)},
+              {.pos = glm::vec3(-0.05f, 0.05f, 0.0f),
+               .color = glm::vec3(0.0f, 1.0f, 0.0f)}};
 
   // clang-format off
 	/* std::vector<float> vertices = { {
@@ -32,7 +32,7 @@ TriangleMesh::TriangleMesh(const vk::Device logical_device,
       .physical_device = physical_device,
   };
 
-  BufferBundle staging_buffer = createBuffer(input_chunk);
+  BufferBundle staging_buffer = create_buffer(input_chunk);
 
   // the monitored memory location
   void *memory_location = logical_device.mapMemory(staging_buffer.buffer_memory,
@@ -44,7 +44,7 @@ TriangleMesh::TriangleMesh(const vk::Device logical_device,
   input_chunk.usage = vk::BufferUsageFlagBits::eTransferDst |
                       vk::BufferUsageFlagBits::eVertexBuffer;
   input_chunk.memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal;
-  vertex_buffer = createBuffer(input_chunk);
+  vertex_buffer = create_buffer(input_chunk);
 
   vk::Result result = copy_buffer(staging_buffer, vertex_buffer,
                                   input_chunk.size, queue, command_buffer);
@@ -58,7 +58,7 @@ TriangleMesh::TriangleMesh(const vk::Device logical_device,
 }
 
 std::uint32_t TriangleMesh::get_vertex_count() const {
-  return static_cast<uint32_t>(vertices.size()); 
+  return static_cast<uint32_t>(vertices.size());
 }
 
 TriangleMesh::~TriangleMesh() {
