@@ -23,7 +23,7 @@ struct BufferBundle {
 
 /**
  * Finds a suitable memory type for buffers e.g. Vertex buffer.
- * @exception throws a runtime error if it fails.
+ * @exception no except, return 0 on failure
  * @param  physical_device physical device to be queried.
  * @param  supported_memory_indices  bit field stores memory
                                   types that are supported.
@@ -33,6 +33,9 @@ inline std::uint32_t
 find_memory_type_index(const vk::PhysicalDevice physical_device,
                        std::uint32_t supported_memory_indices,
                        vk::MemoryPropertyFlags requested_properties) {
+#ifndef NDEBUG
+  std::cout << "finding memory requirements..." << std::endl;
+#endif
   vk::PhysicalDeviceMemoryProperties mem_properties =
       physical_device.getMemoryProperties();
 
@@ -45,7 +48,10 @@ find_memory_type_index(const vk::PhysicalDevice physical_device,
       return i;
     }
   }
-  throw std::runtime_error("failed to find suitable memory type!");
+#ifndef NDEBUG
+  std::cout << "failed to find suitable memory type! Returned 0" << std::endl;
+#endif
+  return 0;
 }
 
 // \brief Handles all buffer creation operations.
@@ -103,14 +109,6 @@ inline vk::Result copy_buffer(const BufferBundle &src_buffer,
       .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
   command_buffer.begin(begin_info);
 
-  /*
-  * // Provided by VK_VERSION_1_0
-  typedef struct VkBufferCopy {
-          VkDeviceSize    srcOffset;
-          VkDeviceSize    dstOffset;
-          VkDeviceSize    size;
-  } VkBufferCopy;
-  */
   vk::BufferCopy copy_region{.srcOffset = 0, .dstOffset = 0, .size = size};
   command_buffer.copyBuffer(src_buffer.buffer, dst_buffer.buffer, 1,
                             &copy_region);
