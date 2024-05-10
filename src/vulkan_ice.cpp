@@ -346,57 +346,63 @@ void VulkanIce::make_assets() {
   meshes = new MeshCollator();
 
   // clang-format off
-  std::vector<Vertex> vertices = {{.pos = glm::vec3(0.0f, -0.05f, 0.0f),
-                                   .color = glm::vec3(1.0f, 1.0f, 1.0f),
-                                   .tex_coord = glm::vec2(0.5f, 0.0f)},
-                                  {.pos = glm::vec3(0.05f, 0.05f, 0.0f),
-                                   .color = glm::vec3(1.0f, 1.0f, 1.0f),
-                                   .tex_coord = glm::vec2(1.0f, 1.0f)},
-                                  {.pos = glm::vec3(-0.05f, 0.05f, 0.0f),
-                                   .color = glm::vec3(1.0f, 1.0f, 1.0f),
-                                   .tex_coord = glm::vec2(0.0f, 1.0f)}};
+  std::vector<Vertex> vertices = {{.pos       = glm::vec3(0.0f, -0.05f, 0.0f),
+                                   .color     = glm::vec3(1.0f, 1.0f, 1.0f),
+      /* 0 */                      .tex_coord = glm::vec2(0.5f, 0.0f)},
+                                  {.pos       = glm::vec3(0.05f, 0.05f, 0.0f),
+                                   .color     = glm::vec3(1.0f, 1.0f, 1.0f),
+      /* 1 */                      .tex_coord = glm::vec2(1.0f, 1.0f)},
+                                  {.pos       = glm::vec3(-0.05f, 0.05f, 0.0f),
+                                   .color     = glm::vec3(1.0f, 1.0f, 1.0f),
+      /* 2 */                      .tex_coord = glm::vec2(0.0f, 1.0f)}};
+  
+ 	std::vector<uint32_t> indices = { {
+			0, 1, 2
+	} };
+
   MeshTypes type = MeshTypes::TRIANGLE;
-  meshes->consume(type, vertices);
+  meshes->consume(type, vertices, indices);
 
   vertices = {
-{.pos{-0.05f, 0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.0f, 1.0f}},
-{.pos{-0.05f, -0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.0f, 0.0f}},
-{.pos{0.05f, -0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{1.0f, 0.0f}},
-{.pos{0.05f, -0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{1.0f, 0.0f}},
-{.pos{0.05f, 0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{1.0f, 1.0f}},
-{.pos{-0.05f, 0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.0f, 1.0f}}
-  };
+{.pos{-0.05f, 0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.0f, 1.0f} }, // 0
+{.pos{-0.05f, -0.05f, 0.0f},.color{1.0f, 1.0f, 1.0f}, .tex_coord{0.0f, 0.0f} }, // 1
+{.pos{0.05f, -0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{1.0f, 0.0f} }, // 2
+{.pos{0.05f, 0.05f, 0.0f},  .color{1.0f, 1.0f, 1.0f}, .tex_coord{1.0f, 1.0f} }  // 3
+};
+
+	indices = { {
+			0, 1, 2,
+			2, 3, 0
+	} };
   type = MeshTypes::SQUARE;
-  meshes->consume(type, vertices);
+  meshes->consume(type, vertices, indices);
 
   vertices = {
-{.pos{-0.05f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.0f, 0.25f}},
-{.pos{-0.02f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.3f, 0.25f}},
-{.pos{-0.03f, 0.0f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.2f,  0.5f}},
-{.pos{-0.02f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.3f, 0.25f}},
-{.pos{0.0f, -0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.5f,  0.0f}},
-{.pos{0.02f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.7f, 0.25f}},
-{.pos{-0.03f, 0.0f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.2f,  0.5f}},
-{.pos{-0.02f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.3f, 0.25f}},
-{.pos{0.02f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.7f, 0.25f}},
-{.pos{0.02f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.7f, 0.25}},
-{.pos{0.05f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{1.0f, 0.25f}},
-{.pos{0.03f, 0.0f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.8f,  0.5f}},
-{.pos{-0.03f, 0.0f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.2f,  0.5f}},
-{.pos{0.02f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.7f, 0.25f}},
-{.pos{0.03f, 0.0f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.8f,  0.5f}},
-{.pos{0.03f, 0.0f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.8f,  0.5f}},
-{.pos{0.04f, 0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.9f,  1.0f}},
-{.pos{0.0f, 0.01f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.5f,  0.6f}},
-{.pos{-0.03f, 0.0f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.2f,  0.5f}},
-{.pos{0.03f, 0.0f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.8f,  0.5f}},
-{.pos{0.0f, 0.01f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.5f,  0.6f}},
-{.pos{-0.03f, 0.0f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.2f,  0.5f}},
-{.pos{0.0f, 0.01f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.5f,  0.6f}},
-{.pos{-0.04f, 0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.1f,  1.0f}}
-              };
+{.pos{-0.05f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.0f, 0.25f}}, // 0
+{.pos{-0.02f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.3f, 0.25f}}, // 1
+{.pos{-0.03f, 0.0f, 0.0f}   , .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.2f,  0.5f}}, // 2
+{.pos{0.0f, -0.05f, 0.0f}   , .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.5f,  0.0f}}, // 3
+{.pos{0.02f, -0.025f, 0.0f} , .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.7f, 0.25f}}, // 4
+{.pos{0.05f, -0.025f, 0.0f} , .color{1.0f, 1.0f, 1.0f}, .tex_coord{1.0f, 0.25f}}, // 5
+{.pos{0.03f, 0.0f, 0.0f}    , .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.8f,  0.5f}}, // 6
+{.pos{0.04f, 0.05f, 0.0f}   , .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.9f,  1.0f}}, // 7
+{.pos{0.0f, 0.01f, 0.0f}    , .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.5f,  0.6f}}, // 8
+{.pos{-0.04f, 0.05f, 0.0f}  , .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.1f,  1.0f}}  // 9
+};
+
+  indices = { {
+			0, 1, 2, 
+			1, 3, 4, 
+			2, 1, 4, 
+			4, 5, 6, 
+			2, 4, 6, 
+			6, 7, 8, 
+			2, 6, 8, 
+			2, 8, 9  
+	} };
+
   type = MeshTypes::STAR;
-  meshes->consume(type, vertices);
+  meshes->consume(type, vertices, indices);
   // clang-format on
   VertexBufferFinalizationInput finalization_info{
       .logical_device = device,
@@ -474,6 +480,8 @@ void VulkanIce::prepare_scene(vk::CommandBuffer command_buffer) {
   vk::Buffer vertex_buffers[] = {meshes->vertex_buffer.buffer};
   vk::DeviceSize offsets[] = {0};
   command_buffer.bindVertexBuffers(0, 1, vertex_buffers, offsets);
+  command_buffer.bindIndexBuffer(meshes->index_buffer.buffer, 0,
+                                 vk::IndexType::eUint32);
 }
 
 // @brief Logic for rendering frames.
@@ -573,11 +581,11 @@ void VulkanIce::render(Scene *scene) {
 void VulkanIce::render_mesh(vk::CommandBuffer command_buffer,
                             MeshTypes mesh_type, uint32_t &start_instance,
                             uint32_t instance_count) {
-  int vertex_count = meshes->sizes.find(mesh_type)->second;
-  int first_vertex = meshes->offsets.find(mesh_type)->second;
+  int index_count = meshes->index_counts.find(mesh_type)->second;
+  int first_index = meshes->index_lump_offsets.find(mesh_type)->second;
   materials[mesh_type]->use(command_buffer, pipeline_layout);
-  command_buffer.draw(vertex_count, instance_count, first_vertex,
-                      start_instance);
+  command_buffer.drawIndexed(index_count, instance_count, first_index, 0,
+                             start_instance);
   start_instance += instance_count;
 }
 
