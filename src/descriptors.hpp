@@ -109,8 +109,8 @@ make_descriptor_pool(vk::Device device, uint32_t size,
 */
 
 inline vk::DescriptorSet
-allocate_descriptor_set(vk::Device device, vk::DescriptorPool descriptor_pool,
-                        vk::DescriptorSetLayout layout) {
+allocate_descriptor_sets(vk::Device device, vk::DescriptorPool descriptor_pool,
+                         vk::DescriptorSetLayout layout) {
 
   vk::DescriptorSetAllocateInfo allocation_info{.descriptorPool =
                                                     descriptor_pool,

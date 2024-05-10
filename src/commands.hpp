@@ -63,5 +63,27 @@ inline void make_frame_command_buffers(const CommandBufferReq &buffer_req) {
     }
   }
 }
+
+// Begin recording a command buffer intended for a single submit.
+inline void start_job(vk::CommandBuffer command_buffer) {
+
+  command_buffer.reset();
+
+  vk::CommandBufferBeginInfo begin_info{
+      .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
+  command_buffer.begin(begin_info);
+}
+
+// Finish recording a command buffer and submit it.
+inline void end_job(vk::CommandBuffer command_buffer,
+                    vk::Queue submission_queue) {
+
+  command_buffer.end();
+
+  vk::SubmitInfo submit_info{.commandBufferCount = 1,
+                             .pCommandBuffers = &command_buffer};
+  auto result = submission_queue.submit(1, &submit_info, nullptr);
+  submission_queue.waitIdle();
+}
 } // namespace ice
 #endif

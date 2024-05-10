@@ -1,6 +1,7 @@
 #ifndef SWAPCHAIN_HPP
 #define SWAPCHAIN_HPP
 
+#include "./images/ice_image.hpp"
 #include "config.hpp"
 #include "data_buffers.hpp"
 #include "queue.hpp"
@@ -251,7 +252,7 @@ create_swapchain_bundle(vk::PhysicalDevice physical_device,
   for (size_t i{0}; i < images.size(); i++) {
 
     // image view
-    vk::ImageViewCreateInfo view_info{
+    /* vk::ImageViewCreateInfo view_info{
         .image = images[i],
         .viewType = vk::ImageViewType::e2D,
         .format = surface_format.format,
@@ -265,10 +266,12 @@ create_swapchain_bundle(vk::PhysicalDevice physical_device,
                              .baseArrayLayer = 0,
                              .layerCount = 1}
 
-    };
+    }; */
 
     bundle.frames[i].image = images[i];
-    bundle.frames[i].image_view = logical_device.createImageView(view_info);
+    bundle.frames[i].image_view = ice_image::make_image_view(
+        logical_device, images[i],
+        surface_format.format); // logical_device.createImageView(view_info);
   }
   bundle.format = surface_format.format;
   bundle.extent = extent;

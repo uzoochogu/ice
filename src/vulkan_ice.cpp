@@ -1,4 +1,5 @@
 #include "vulkan_ice.hpp"
+#include "images/ice_image.hpp"
 
 namespace ice {
 VulkanIce::VulkanIce(IceWindow &window) : window{window} {
@@ -13,16 +14,16 @@ VulkanIce::VulkanIce(IceWindow &window) : window{window} {
 
   setup_swapchain(nullptr);
 
-  setup_descriptor_set_layout();
+  setup_descriptor_set_layouts();
 
   // Render pass and Pipeline creation
-  GraphicsPipelineInBundle spec{.device = device,
-                                .vertex_filepath = "resources/shaders/vert.spv",
-                                .fragment_filepath =
-                                    "resources/shaders/frag.spv",
-                                .swapchain_extent = swapchain_extent,
-                                .swapchain_image_format = swapchain_format,
-                                .descriptor_set_layout = descriptor_set_layout};
+  GraphicsPipelineInBundle spec{
+      .device = device,
+      .vertex_filepath = "resources/shaders/vert.spv",
+      .fragment_filepath = "resources/shaders/frag.spv",
+      .swapchain_extent = swapchain_extent,
+      .swapchain_image_format = swapchain_format,
+      .descriptor_set_layouts = {frame_set_layout, mesh_set_layout}};
 
   GraphicsPipelineOutBundle graphics_bundle = make_graphics_pipeline(spec);
 
@@ -56,10 +57,15 @@ VulkanIce::~VulkanIce() {
 
   destroy_swapchain_bundle();
 
-  device.destroyDescriptorSetLayout(descriptor_set_layout);
+  device.destroyDescriptorSetLayout(frame_set_layout);
+  device.destroyDescriptorSetLayout(mesh_set_layout);
+  device.destroyDescriptorPool(mesh_descriptor_pool);
 
-  // delete triangle_mesh;
   delete meshes;
+
+  for (const auto &[key, texture] : materials) {
+    delete texture;
+  }
 
   device.destroy();
 
@@ -216,27 +222,38 @@ void VulkanIce::setup_swapchain(vk::SwapchainKHR *old_swapchain) {
   max_frames_in_flight = static_cast<uint32_t>(swapchain_frames.size());
 }
 
-void VulkanIce::setup_descriptor_set_layout() {
+void VulkanIce::setup_descriptor_set_layouts() {
   // Populate DescriptorSetLayoutData
   // UBO Binding 0
-  descriptor_set_layout_bindings = {.count = 2};
-  descriptor_set_layout_bindings.indices.push_back(0);
-  descriptor_set_layout_bindings.types.push_back(
-      vk::DescriptorType::eUniformBuffer);
-  descriptor_set_layout_bindings.descriptor_counts.push_back(1);
-  descriptor_set_layout_bindings.stages.push_back(
-      vk::ShaderStageFlagBits::eVertex);
+  frame_set_layout_bindings;
+
+  frame_set_layout_bindings = {.count = 2};
+  frame_set_layout_bindings.indices.push_back(0);
+  frame_set_layout_bindings.types.push_back(vk::DescriptorType::eUniformBuffer);
+  frame_set_layout_bindings.descriptor_counts.push_back(1);
+  frame_set_layout_bindings.stages.push_back(vk::ShaderStageFlagBits::eVertex);
 
   // model transforms binding 1
-  descriptor_set_layout_bindings.indices.push_back(1);
-  descriptor_set_layout_bindings.types.push_back(
-      vk::DescriptorType::eStorageBuffer);
-  descriptor_set_layout_bindings.descriptor_counts.push_back(1);
-  descriptor_set_layout_bindings.stages.push_back(
-      vk::ShaderStageFlagBits::eVertex);
+  frame_set_layout_bindings.indices.push_back(1);
+  frame_set_layout_bindings.types.push_back(vk::DescriptorType::eStorageBuffer);
+  frame_set_layout_bindings.descriptor_counts.push_back(1);
+  frame_set_layout_bindings.stages.push_back(vk::ShaderStageFlagBits::eVertex);
 
-  descriptor_set_layout =
-      make_descriptor_set_layout(device, descriptor_set_layout_bindings);
+  // set and bindings once per frame
+  frame_set_layout =
+      make_descriptor_set_layout(device, frame_set_layout_bindings);
+
+  // bindings for individual draw calls
+  mesh_set_layout_bindings = {.count = 1};
+
+  mesh_set_layout_bindings.indices.push_back(0);
+  mesh_set_layout_bindings.types.push_back(
+      vk::DescriptorType::eCombinedImageSampler);
+  mesh_set_layout_bindings.descriptor_counts.push_back(1);
+  mesh_set_layout_bindings.stages.push_back(vk::ShaderStageFlagBits::eFragment);
+
+  mesh_set_layout =
+      make_descriptor_set_layout(device, mesh_set_layout_bindings);
 }
 
 void VulkanIce::setup_framebuffers() {
@@ -263,9 +280,9 @@ void VulkanIce::setup_command_buffers() {
 // Sets up frame resources like sync objects, UBOs etc
 void VulkanIce::setup_frame_resources() {
   // A descriptor set per frame
-  descriptor_pool = make_descriptor_pool(
+  frame_descriptor_pool = make_descriptor_pool(
       device, static_cast<uint32_t>(swapchain_frames.size()),
-      descriptor_set_layout_bindings);
+      frame_set_layout_bindings);
 
   for (SwapChainFrame &frame : swapchain_frames) {
     frame.in_flight_fence = make_fence(device);
@@ -273,8 +290,8 @@ void VulkanIce::setup_frame_resources() {
     frame.render_finished = make_semaphore(device);
 
     frame.make_ubo_resources(device, physical_device);
-    frame.descriptor_set =
-        allocate_descriptor_set(device, descriptor_pool, descriptor_set_layout);
+    frame.descriptor_set = allocate_descriptor_sets(
+        device, frame_descriptor_pool, frame_set_layout);
   }
 }
 
@@ -326,57 +343,61 @@ void VulkanIce::recreate_swapchain() {
 }
 
 void VulkanIce::make_assets() {
-  /* triangle_mesh = new TriangleMesh(device, physical_device, graphics_queue,
-                                   main_command_buffer); */
-
-  // meshes = std::make_unique<MeshCollator>();
   meshes = new MeshCollator();
 
-  std::vector<Vertex> vertices = {{.pos = glm::vec3(0.0f, -0.05f, 1.0f),
-                                   .color = glm::vec3(0.0f, 1.0f, 0.0f)},
+  // clang-format off
+  std::vector<Vertex> vertices = {{.pos = glm::vec3(0.0f, -0.05f, 0.0f),
+                                   .color = glm::vec3(1.0f, 1.0f, 1.0f),
+                                   .tex_coord = glm::vec2(0.5f, 0.0f)},
                                   {.pos = glm::vec3(0.05f, 0.05f, 0.0f),
-                                   .color = glm::vec3(0.0f, 1.0f, 0.0f)},
+                                   .color = glm::vec3(1.0f, 1.0f, 1.0f),
+                                   .tex_coord = glm::vec2(1.0f, 1.0f)},
                                   {.pos = glm::vec3(-0.05f, 0.05f, 0.0f),
-                                   .color = glm::vec3(0.0f, 1.0f, 0.0f)}};
+                                   .color = glm::vec3(1.0f, 1.0f, 1.0f),
+                                   .tex_coord = glm::vec2(0.0f, 1.0f)}};
   MeshTypes type = MeshTypes::TRIANGLE;
   meshes->consume(type, vertices);
 
-  vertices = {{.pos = {-0.05f, 0.05f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
-              {.pos = {-0.05f, -0.05f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
-              {.pos = {0.05f, -0.05f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
-              {.pos = {0.05f, -0.05f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
-              {.pos = {0.05f, 0.05f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}},
-              {.pos = {-0.05f, 0.05f, 0.0f}, .color = {1.0f, 0.0f, 0.0f}}};
+  vertices = {
+{.pos{-0.05f, 0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.0f, 1.0f}},
+{.pos{-0.05f, -0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.0f, 0.0f}},
+{.pos{0.05f, -0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{1.0f, 0.0f}},
+{.pos{0.05f, -0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{1.0f, 0.0f}},
+{.pos{0.05f, 0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{1.0f, 1.0f}},
+{.pos{-0.05f, 0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.0f, 1.0f}}
+  };
   type = MeshTypes::SQUARE;
   meshes->consume(type, vertices);
 
-  vertices = {{.pos = {-0.05f, -0.025f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {-0.02f, -0.025f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {-0.03f, 0.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {-0.02f, -0.025f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {0.0f, -0.05f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {0.02f, -0.025f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {-0.03f, 0.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {-0.02f, -0.025f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {0.02f, -0.025f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {0.02f, -0.025f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {0.05f, -0.025f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {0.03f, 0.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {-0.03f, 0.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {0.02f, -0.025f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {0.03f, 0.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {0.03f, 0.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {0.04f, 0.05f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {0.0f, 0.01f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {-0.03f, 0.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {0.03f, 0.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {0.0f, 0.01f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {-0.03f, 0.0f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {0.0f, 0.01f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}},
-              {.pos = {-0.04f, 0.05f, 0.0f}, .color = {0.0f, 0.0f, 1.0f}}};
+  vertices = {
+{.pos{-0.05f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.0f, 0.25f}},
+{.pos{-0.02f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.3f, 0.25f}},
+{.pos{-0.03f, 0.0f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.2f,  0.5f}},
+{.pos{-0.02f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.3f, 0.25f}},
+{.pos{0.0f, -0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.5f,  0.0f}},
+{.pos{0.02f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.7f, 0.25f}},
+{.pos{-0.03f, 0.0f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.2f,  0.5f}},
+{.pos{-0.02f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.3f, 0.25f}},
+{.pos{0.02f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.7f, 0.25f}},
+{.pos{0.02f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.7f, 0.25}},
+{.pos{0.05f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{1.0f, 0.25f}},
+{.pos{0.03f, 0.0f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.8f,  0.5f}},
+{.pos{-0.03f, 0.0f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.2f,  0.5f}},
+{.pos{0.02f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.7f, 0.25f}},
+{.pos{0.03f, 0.0f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.8f,  0.5f}},
+{.pos{0.03f, 0.0f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.8f,  0.5f}},
+{.pos{0.04f, 0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.9f,  1.0f}},
+{.pos{0.0f, 0.01f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.5f,  0.6f}},
+{.pos{-0.03f, 0.0f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.2f,  0.5f}},
+{.pos{0.03f, 0.0f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.8f,  0.5f}},
+{.pos{0.0f, 0.01f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.5f,  0.6f}},
+{.pos{-0.03f, 0.0f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.2f,  0.5f}},
+{.pos{0.0f, 0.01f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.5f,  0.6f}},
+{.pos{-0.04f, 0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.1f,  1.0f}}
+              };
   type = MeshTypes::STAR;
   meshes->consume(type, vertices);
-
+  // clang-format on
   VertexBufferFinalizationInput finalization_info{
       .logical_device = device,
       .physical_device = physical_device,
@@ -384,6 +405,31 @@ void VulkanIce::make_assets() {
       .queue = graphics_queue};
 
   meshes->finalize(finalization_info);
+
+  // Materials
+  std::unordered_map<MeshTypes, const char *> filenames = {
+      {MeshTypes::TRIANGLE, "resources/textures/david.jpg"},
+      {MeshTypes::SQUARE, "resources/textures/haus.jpg"},
+      {MeshTypes::STAR, "resources/textures/viking_room.png"}};
+
+  // mesh descriptor pool
+  mesh_descriptor_pool =
+      make_descriptor_pool(device, static_cast<uint32_t>(filenames.size()),
+                           mesh_set_layout_bindings);
+
+  ice_image::TextureCreationInput texture_info{
+      .physical_device = physical_device,
+      .logical_device = device,
+      .command_buffer = main_command_buffer,
+      .queue = graphics_queue,
+      .layout = mesh_set_layout,
+      .descriptor_pool = mesh_descriptor_pool};
+
+  for (const auto &[object, filename] : filenames) {
+    texture_info.filename = filename;
+    materials[object] = new ice_image::Texture(texture_info);
+  }
+  std::cout << "Finished making assets" << std::endl;
 }
 
 void VulkanIce::prepare_frame(std::uint32_t image_index, Scene *scene) {
@@ -524,6 +570,17 @@ void VulkanIce::render(Scene *scene) {
   current_frame = (current_frame + 1) % max_frames_in_flight;
 }
 
+void VulkanIce::render_mesh(vk::CommandBuffer command_buffer,
+                            MeshTypes mesh_type, uint32_t &start_instance,
+                            uint32_t instance_count) {
+  int vertex_count = meshes->sizes.find(mesh_type)->second;
+  int first_vertex = meshes->offsets.find(mesh_type)->second;
+  materials[mesh_type]->use(command_buffer, pipeline_layout);
+  command_buffer.draw(vertex_count, instance_count, first_vertex,
+                      start_instance);
+  start_instance += instance_count;
+}
+
 void VulkanIce::record_draw_commands(vk::CommandBuffer command_buffer,
                                      uint32_t image_index, Scene *scene) {
 
@@ -561,31 +618,18 @@ void VulkanIce::record_draw_commands(vk::CommandBuffer command_buffer,
 
   // instancing
   // Triangles
-  std::uint32_t vertex_count = meshes->sizes.find(MeshTypes::TRIANGLE)->second;
-  std::uint32_t first_vertex =
-      meshes->offsets.find(MeshTypes::TRIANGLE)->second;
-  uint32_t start_instance = 0;
-  uint32_t instance_count =
-      static_cast<uint32_t>(scene->triangle_positions.size());
-  command_buffer.draw(vertex_count, instance_count, first_vertex,
-                      start_instance);
-  start_instance += instance_count;
+  std::uint32_t start_instance = 0;
+
+  render_mesh(command_buffer, MeshTypes::TRIANGLE, start_instance,
+              static_cast<uint32_t>(scene->triangle_positions.size()));
 
   // squares
-  vertex_count = meshes->sizes.find(MeshTypes::SQUARE)->second;
-  first_vertex = meshes->offsets.find(MeshTypes::SQUARE)->second;
-  instance_count = static_cast<uint32_t>(scene->square_positions.size());
-  command_buffer.draw(vertex_count, instance_count, first_vertex,
-                      start_instance);
-  start_instance += instance_count;
+  render_mesh(command_buffer, MeshTypes::SQUARE, start_instance,
+              static_cast<uint32_t>(scene->square_positions.size()));
 
   // stars
-  vertex_count = meshes->sizes.find(MeshTypes::STAR)->second;
-  first_vertex = meshes->offsets.find(MeshTypes::STAR)->second;
-  instance_count = static_cast<uint32_t>(scene->star_positions.size());
-  command_buffer.draw(vertex_count, instance_count, first_vertex,
-                      start_instance);
-  start_instance += instance_count;
+  render_mesh(command_buffer, MeshTypes::STAR, start_instance,
+              static_cast<uint32_t>(scene->star_positions.size()));
 
   command_buffer.endRenderPass();
 
@@ -781,7 +825,7 @@ void VulkanIce::destroy_swapchain_bundle(bool include_swapchain) {
     device.destroySwapchainKHR(swapchain);
   }
 
-  device.destroyDescriptorPool(descriptor_pool);
+  device.destroyDescriptorPool(frame_descriptor_pool);
 }
 
 } // namespace ice

@@ -81,7 +81,7 @@ private:
   void setup_swapchain(vk::SwapchainKHR *old_swapchain = nullptr);
   void recreate_swapchain();
 
-  void setup_descriptor_set_layout();
+  void setup_descriptor_set_layouts();
 
   // final frame resource setup
   void setup_framebuffers();
@@ -90,6 +90,8 @@ private:
 
   // asset setup
   void make_assets();
+  void render_mesh(vk::CommandBuffer command_buffer, MeshTypes mesh_type,
+                   uint32_t &start_instance, uint32_t instance_count);
 
   // frame and scene prep
   void prepare_frame(std::uint32_t image_index, Scene *scene);
@@ -116,11 +118,15 @@ private:
   // TriangleMesh *triangle_mesh;
   // std::unique_ptr<MeshCollator> meshes;
   MeshCollator *meshes;
+  std::unordered_map<MeshTypes, ice_image::Texture *> materials;
 
-  // descriptor-related
-  vk::DescriptorSetLayout descriptor_set_layout;
-  vk::DescriptorPool descriptor_pool;
-  DescriptorSetLayoutData descriptor_set_layout_bindings;
+  // descriptor-related variables
+  vk::DescriptorSetLayout frame_set_layout;
+  vk::DescriptorPool frame_descriptor_pool;
+  DescriptorSetLayoutData frame_set_layout_bindings;
+  vk::DescriptorSetLayout mesh_set_layout;
+  vk::DescriptorPool mesh_descriptor_pool;
+  DescriptorSetLayoutData mesh_set_layout_bindings;
 
   // command related variables
   vk::CommandPool command_pool;

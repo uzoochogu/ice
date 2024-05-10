@@ -14,7 +14,7 @@ struct GraphicsPipelineInBundle {
   std::string fragment_filepath;
   vk::Extent2D swapchain_extent;
   vk::Format swapchain_image_format;
-  vk::DescriptorSetLayout descriptor_set_layout;
+  std::vector<vk::DescriptorSetLayout> descriptor_set_layouts;
 };
 
 struct GraphicsPipelineOutBundle {
@@ -23,15 +23,16 @@ struct GraphicsPipelineOutBundle {
   vk::Pipeline pipeline;
 };
 
-inline vk::PipelineLayout
-make_pipeline_layout(const vk::Device &device,
-                     vk::DescriptorSetLayout descriptor_set_layout) {
+inline vk::PipelineLayout make_pipeline_layout(
+    const vk::Device &device,
+    const std::vector<vk::DescriptorSetLayout> &descriptor_set_layouts) {
 #ifndef NDEBUG
   std::cout << "Making pipeline layout" << std::endl;
 #endif
   vk::PipelineLayoutCreateInfo layout_info{
-      .setLayoutCount = 1,
-      .pSetLayouts = &descriptor_set_layout,
+      .setLayoutCount =
+          static_cast<std::uint32_t>(descriptor_set_layouts.size()),
+      .pSetLayouts = descriptor_set_layouts.data(),
       .pushConstantRangeCount = 0,
   };
 
@@ -89,15 +90,16 @@ make_graphics_pipeline(const GraphicsPipelineInBundle &specification) {
   // Vertex input
   // Get vertex data binding descriptions
   vk::VertexInputBindingDescription binding_description =
-      Vertex::getBindingDescription();
-  std::array<vk::VertexInputAttributeDescription, 2> attribute_descriptions =
-      Vertex::getAttributeDescriptions();
+      Vertex::get_binding_description();
+  std::vector<vk::VertexInputAttributeDescription> attribute_descriptions =
+      Vertex::get_attribute_descriptions();
 
   vk::PipelineVertexInputStateCreateInfo vertex_input_info = {
       .flags = vk::PipelineVertexInputStateCreateFlags(),
       .vertexBindingDescriptionCount = 1,
       .pVertexBindingDescriptions = &binding_description,
-      .vertexAttributeDescriptionCount = 2,
+      .vertexAttributeDescriptionCount =
+          static_cast<std::uint32_t>(attribute_descriptions.size()),
       .pVertexAttributeDescriptions = attribute_descriptions.data()};
   pipeline_info.pVertexInputState = &vertex_input_info;
 
@@ -227,7 +229,7 @@ make_graphics_pipeline(const GraphicsPipelineInBundle &specification) {
 
   // Pipeline layout
   vk::PipelineLayout pipeline_layout = make_pipeline_layout(
-      specification.device, specification.descriptor_set_layout);
+      specification.device, specification.descriptor_set_layouts);
   pipeline_info.layout = pipeline_layout;
 
   //  Renderpass
