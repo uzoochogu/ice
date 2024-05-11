@@ -20,10 +20,11 @@ struct TextureCreationInput {
 struct ImageCreationInput {
   vk::Device logical_device;
   vk::PhysicalDevice physical_device;
-  int width, height;
+  std::uint32_t width, height;
   vk::ImageTiling tiling;
   vk::ImageUsageFlags usage;
   vk::MemoryPropertyFlags memory_properties;
+  vk::Format format;
 };
 
 // input needed for image layout transitions jobs
@@ -126,7 +127,12 @@ void copy_buffer_to_image(const BufferImageCopyJob &copy_job);
 
 // Create a view of a vulkan image.
 vk::ImageView make_image_view(vk::Device logical_device, vk::Image image,
-                              vk::Format format);
+                              vk::Format format, vk::ImageAspectFlags aspect);
+
+vk::Format find_supported_format(vk::PhysicalDevice physical_device,
+                                 const std::vector<vk::Format> &candidates,
+                                 vk::ImageTiling tiling,
+                                 vk::FormatFeatureFlags features);
 } // namespace ice_image
 
 #endif

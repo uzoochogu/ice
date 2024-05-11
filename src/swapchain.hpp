@@ -13,11 +13,22 @@ namespace ice {
 // @brief Bundles everything related to a swapchain frame: image, image view,
 // frame buffer, command buffer, per-frame descriptors like UBO and model
 // transforms and synchronization objects
-struct SwapChainFrame {
+class SwapChainFrame {
+
+public:
+  // For doing work
+  vk::PhysicalDevice physical_device;
+  vk::Device logical_device;
+
   // swapchain essentials
   vk::Image image;
   vk::ImageView image_view;
   vk::Framebuffer framebuffer;
+  vk::Image depth_buffer;
+  vk::DeviceMemory depth_buffer_memory;
+  vk::ImageView depth_buffer_view;
+  vk::Format depth_format;
+  vk::Extent2D extent;
 
   vk::CommandBuffer command_buffer;
 
@@ -38,66 +49,13 @@ struct SwapChainFrame {
   vk::DescriptorBufferInfo model_buffer_descriptor_info;
   vk::DescriptorSet descriptor_set;
 
-  void make_ubo_resources(vk::Device logical_device,
-                          vk::PhysicalDevice physical_device) {
+  void make_descriptor_resources();
 
-    BufferCreationInput input{
-        .size = sizeof(UBO),
-        .usage = vk::BufferUsageFlagBits::eUniformBuffer,
-        .memory_properties = vk::MemoryPropertyFlagBits::eHostVisible |
-                             vk::MemoryPropertyFlagBits::eHostCoherent,
-        .logical_device = logical_device,
+  void make_depth_resources();
 
-        .physical_device = physical_device,
-    };
+  void write_descriptor_set();
 
-    camera_data_buffer = create_buffer(input);
-
-    camera_data_write_location = logical_device.mapMemory(
-        camera_data_buffer.buffer_memory, 0, sizeof(UBO));
-
-    // model data
-    constexpr const std::uint32_t INSTANCES = 1024;
-    input.size = INSTANCES * sizeof(glm::mat4);
-    input.usage = vk::BufferUsageFlagBits::eStorageBuffer;
-    model_buffer = create_buffer(input);
-
-    model_buffer_write_location = logical_device.mapMemory(
-        model_buffer.buffer_memory, 0, INSTANCES * sizeof(glm::mat4));
-
-    model_transforms.reserve(INSTANCES);
-    for (std::uint32_t i = 0; i < INSTANCES; ++i) {
-      model_transforms.push_back(glm::mat4(1.0f));
-    }
-
-    uniform_buffer_descriptor_info = {
-        .buffer = camera_data_buffer.buffer, .offset = 0, .range = sizeof(UBO)};
-
-    model_buffer_descriptor_info = {.buffer = model_buffer.buffer,
-                                    .offset = 0,
-                                    .range = INSTANCES * sizeof(glm::mat4)};
-  }
-
-  void write_descriptor_set(vk::Device device) {
-
-    vk::WriteDescriptorSet write_info{
-        .dstSet = descriptor_set,
-        .dstBinding = 0,
-        .dstArrayElement =
-            0, // byte offset within binding for inline uniform blocks
-        .descriptorCount = 1,
-        .descriptorType = vk::DescriptorType::eUniformBuffer,
-        .pBufferInfo = &uniform_buffer_descriptor_info};
-
-    device.updateDescriptorSets(write_info, nullptr);
-
-    // transforms write info
-    write_info.dstBinding = 1,
-    write_info.descriptorType = vk::DescriptorType::eStorageBuffer;
-    write_info.pBufferInfo = &model_buffer_descriptor_info;
-
-    device.updateDescriptorSets(write_info, nullptr);
-  }
+  void destroy();
 };
 
 // @brief Bundles handles that would be created  with swapchain:
@@ -106,7 +64,6 @@ struct SwapChainBundle {
   vk::SwapchainKHR swapchain;
   std::vector<SwapChainFrame> frames;
   vk::Format format;
-  vk::Extent2D extent;
 };
 
 // @brief stores swapchain support details: capabilities, formats and
@@ -250,31 +207,20 @@ create_swapchain_bundle(vk::PhysicalDevice physical_device,
       logical_device.getSwapchainImagesKHR(bundle.swapchain);
   bundle.frames.resize(images.size());
   for (size_t i{0}; i < images.size(); i++) {
+    bundle.frames[i].physical_device = physical_device;
+    bundle.frames[i].logical_device = logical_device;
 
-    // image view
-    /* vk::ImageViewCreateInfo view_info{
-        .image = images[i],
-        .viewType = vk::ImageViewType::e2D,
-        .format = surface_format.format,
-        .components = {.r = vk::ComponentSwizzle::eIdentity,
-                       .g = vk::ComponentSwizzle::eIdentity,
-                       .b = vk::ComponentSwizzle::eIdentity,
-                       .a = vk::ComponentSwizzle::eIdentity},
-        .subresourceRange = {.aspectMask = vk::ImageAspectFlagBits::eColor,
-                             .baseMipLevel = 0,
-                             .levelCount = 1,
-                             .baseArrayLayer = 0,
-                             .layerCount = 1}
-
-    }; */
-
+    bundle.frames[i].extent = extent;
     bundle.frames[i].image = images[i];
     bundle.frames[i].image_view = ice_image::make_image_view(
-        logical_device, images[i],
-        surface_format.format); // logical_device.createImageView(view_info);
+        logical_device, images[i], surface_format.format,
+        vk::ImageAspectFlagBits::eColor);
+
+    // make frame depth resources
+    bundle.frames[i].make_depth_resources();
   }
+
   bundle.format = surface_format.format;
-  bundle.extent = extent;
 
   return bundle;
 }

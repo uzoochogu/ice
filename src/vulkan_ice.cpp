@@ -23,6 +23,9 @@ VulkanIce::VulkanIce(IceWindow &window) : window{window} {
       .fragment_filepath = "resources/shaders/frag.spv",
       .swapchain_extent = swapchain_extent,
       .swapchain_image_format = swapchain_format,
+      .swapchain_depth_format =
+          swapchain_frames[0].depth_format /* at least 1 is guaranteed*/,
+
       .descriptor_set_layouts = {frame_set_layout, mesh_set_layout}};
 
   GraphicsPipelineOutBundle graphics_bundle = make_graphics_pipeline(spec);
@@ -216,7 +219,8 @@ void VulkanIce::setup_swapchain(vk::SwapchainKHR *old_swapchain) {
   swapchain = bundle.swapchain;
   swapchain_frames = bundle.frames;
   swapchain_format = bundle.format;
-  swapchain_extent = bundle.extent;
+  swapchain_extent =
+      bundle.frames[0].extent; // at least one frame is guaranteed
 
   // set max frames
   max_frames_in_flight = static_cast<uint32_t>(swapchain_frames.size());
@@ -289,7 +293,7 @@ void VulkanIce::setup_frame_resources() {
     frame.image_available = make_semaphore(device);
     frame.render_finished = make_semaphore(device);
 
-    frame.make_ubo_resources(device, physical_device);
+    frame.make_descriptor_resources();
     frame.descriptor_set = allocate_descriptor_sets(
         device, frame_descriptor_pool, frame_set_layout);
   }
@@ -473,7 +477,7 @@ void VulkanIce::prepare_frame(std::uint32_t image_index, Scene *scene) {
   memcpy(_frame.model_buffer_write_location, _frame.model_transforms.data(),
          i * sizeof(glm::mat4));
 
-  _frame.write_descriptor_set(device);
+  _frame.write_descriptor_set();
 }
 
 void VulkanIce::prepare_scene(vk::CommandBuffer command_buffer) {
@@ -599,7 +603,12 @@ void VulkanIce::record_draw_commands(vk::CommandBuffer command_buffer,
   } catch (vk::SystemError err) {
     throw std::runtime_error("Failed to begin recording command buffer!");
   }
-  vk::ClearValue clear_color = {std::array<float, 4>{1.0f, 0.5f, 0.25f, 1.0f}};
+  // clear values unions
+  vk::ClearValue clear_color =
+      vk::ClearColorValue({std::array<float, 4>{1.0f, 0.5f, 0.25f, 1.0f}});
+  vk::ClearValue clear_depth = vk::ClearDepthStencilValue({1.0f, 0});
+
+  std::vector<vk::ClearValue> clear_values = {{clear_color, clear_depth}};
 
   vk::RenderPassBeginInfo renderpass_info = {
       .renderPass = renderpass,
@@ -609,8 +618,8 @@ void VulkanIce::record_draw_commands(vk::CommandBuffer command_buffer,
           .extent = swapchain_extent,
       },
 
-      .clearValueCount = 1,
-      .pClearValues = &clear_color,
+      .clearValueCount = static_cast<std::uint32_t>(clear_values.size()),
+      .pClearValues = clear_values.data(),
   };
 
   command_buffer.beginRenderPass(&renderpass_info,
@@ -812,21 +821,7 @@ void VulkanIce::pick_physical_device() {
 
 void VulkanIce::destroy_swapchain_bundle(bool include_swapchain) {
   for (auto frame : swapchain_frames) {
-    device.destroyImageView(frame.image_view);
-    device.destroyFramebuffer(frame.framebuffer);
-    // sync objects
-    device.destroySemaphore(frame.render_finished);
-    device.destroySemaphore(frame.image_available);
-    device.destroyFence(frame.in_flight_fence);
-
-    // resources
-    device.unmapMemory(frame.camera_data_buffer.buffer_memory);
-    device.freeMemory(frame.camera_data_buffer.buffer_memory);
-    device.destroyBuffer(frame.camera_data_buffer.buffer);
-
-    device.unmapMemory(frame.model_buffer.buffer_memory);
-    device.freeMemory(frame.model_buffer.buffer_memory);
-    device.destroyBuffer(frame.model_buffer.buffer);
+    frame.destroy();
   }
 
   if (include_swapchain) {

@@ -21,7 +21,10 @@ struct FramebufferInput {
 inline void make_framebuffers(const FramebufferInput &input_bundle,
                               std::vector<SwapChainFrame> &out_frames) {
   for (int i = 0; i < out_frames.size(); ++i) {
-    std::vector<vk::ImageView> attachments = {out_frames[i].image_view};
+    std::vector<vk::ImageView> attachments = {
+        out_frames[i].image_view,
+        out_frames[i].depth_buffer_view,
+    };
 
     vk::FramebufferCreateInfo framebuffer_info{
         .renderPass = input_bundle.renderpass,
@@ -30,8 +33,10 @@ inline void make_framebuffers(const FramebufferInput &input_bundle,
         .width = input_bundle.swapchain_extent.width,
         .height = input_bundle.swapchain_extent.height,
         .layers = 1};
+
     out_frames[i].framebuffer =
         input_bundle.device.createFramebuffer(framebuffer_info);
+
     if (out_frames[i].framebuffer == nullptr) {
       std::cout << std::format("Failed to create framebuffer for frame {}", i)
                 << std::endl;

@@ -20,13 +20,14 @@ Texture::Texture(const TextureCreationInput &input) {
 
   ImageCreationInput image_input{.logical_device = logical_device,
                                  .physical_device = physical_device,
-                                 .width = width,
-                                 .height = height,
+                                 .width = static_cast<std::uint32_t>(width),
+                                 .height = static_cast<std::uint32_t>(height),
                                  .tiling = vk::ImageTiling::eOptimal,
                                  .usage = vk::ImageUsageFlagBits::eTransferDst |
                                           vk::ImageUsageFlagBits::eSampled,
                                  .memory_properties =
-                                     vk::MemoryPropertyFlagBits::eDeviceLocal};
+                                     vk::MemoryPropertyFlagBits::eDeviceLocal,
+                                 .format = vk::Format::eR8G8B8A8Unorm};
 
   image = make_image(image_input);
 #ifndef NDEBUG
@@ -120,7 +121,8 @@ void Texture::populate() {
 
 void Texture::make_view() {
   image_view =
-      make_image_view(logical_device, image, vk::Format::eR8G8B8A8Unorm);
+      make_image_view(logical_device, image, vk::Format::eR8G8B8A8Unorm,
+                      vk::ImageAspectFlagBits::eColor);
 }
 
 void Texture::make_sampler() {
@@ -184,7 +186,7 @@ vk::Image ice_image::make_image(const ImageCreationInput &input) {
       .flags = vk::ImageCreateFlagBits(),
 
       .imageType = vk::ImageType::e2D,
-      .format = vk::Format::eR8G8B8A8Unorm,
+      .format = input.format,
       .extent = vk::Extent3D(input.width, input.height, 1),
 
       .mipLevels = 1,
@@ -302,7 +304,6 @@ void ice_image::copy_buffer_to_image(const BufferImageCopyJob &copy_job) {
       .mipLevel = 0,
       .baseArrayLayer = 0,
       .layerCount = 1,
-
   };
 
   copy.imageSubresource = access;
@@ -315,7 +316,8 @@ void ice_image::copy_buffer_to_image(const BufferImageCopyJob &copy_job) {
 }
 
 vk::ImageView ice_image::make_image_view(vk::Device logical_device,
-                                         vk::Image image, vk::Format format) {
+                                         vk::Image image, vk::Format format,
+                                         vk::ImageAspectFlags aspect) {
   vk::ImageViewCreateInfo create_info = {
       .image = image,
       .viewType = vk::ImageViewType::e2D,
@@ -325,7 +327,7 @@ vk::ImageView ice_image::make_image_view(vk::Device logical_device,
                      .b = vk::ComponentSwizzle::eIdentity,
                      .a = vk::ComponentSwizzle::eIdentity},
       .subresourceRange = {
-          .aspectMask = vk::ImageAspectFlagBits::eColor,
+          .aspectMask = aspect,
           .baseMipLevel = 0,
           .levelCount = 1,
           .baseArrayLayer = 0,
@@ -333,6 +335,32 @@ vk::ImageView ice_image::make_image_view(vk::Device logical_device,
       }};
 
   return logical_device.createImageView(create_info);
+}
+
+// utils
+
+// @brief Finds supported format given some candidates and features to look for.
+// @exception throws a runtime error if no format is found
+vk::Format find_supported_format(vk::PhysicalDevice physical_device,
+                                 const std::vector<vk::Format> &candidates,
+                                 vk::ImageTiling tiling,
+                                 vk::FormatFeatureFlags features) {
+  for (vk::Format format : candidates) {
+
+    vk::FormatProperties properties =
+        physical_device.getFormatProperties(format);
+
+    if (tiling == vk::ImageTiling::eLinear &&
+        (properties.linearTilingFeatures & features) == features) {
+      return format;
+    }
+
+    if (tiling == vk::ImageTiling::eOptimal &&
+        (properties.optimalTilingFeatures & features) == features) {
+      return format;
+    }
+  }
+  throw std::runtime_error("Unable to find suitable format");
 }
 
 } // namespace ice_image
