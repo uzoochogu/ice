@@ -104,6 +104,7 @@ void ObjMesh::read_corner(const std::string &vertex_description) {
 
   std::vector<std::string> v_vt_vn = split(vertex_description, "/");
 
+  // prepare attributes
   // position
   glm::vec3 pos = v[std::stol(v_vt_vn[0]) - 1]; // obj uses 1 based indexing
 
@@ -113,8 +114,13 @@ void ObjMesh::read_corner(const std::string &vertex_description) {
     texcoord = vt[std::stol(v_vt_vn[1]) - 1];
   }
 
+  // normals
+  glm::vec3 normal = vn[std::stol(v_vt_vn[2]) - 1];
+
   // Append Vertex
-  vertices.push_back(
-      Vertex{.pos = pos, .color = brush_color, .tex_coord = texcoord});
+  vertices.push_back(Vertex{.pos = pos,
+                            .color = brush_color,
+                            .tex_coord = texcoord,
+                            .normal = normal});
 }
 } // namespace ice

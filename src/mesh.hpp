@@ -16,6 +16,7 @@ struct Vertex {
   glm::vec3 pos;
   glm::vec3 color;
   glm::vec2 tex_coord;
+  glm::vec3 normal;
 
   // A vertex binding describes at which rate to load data from memory
   // throughout the vertices. It specifies the number of bytes between data
@@ -38,7 +39,7 @@ struct Vertex {
 
   static std::vector<vk::VertexInputAttributeDescription>
   get_attribute_descriptions() {
-    std::vector<vk::VertexInputAttributeDescription> attribute_descriptions(3);
+    std::vector<vk::VertexInputAttributeDescription> attribute_descriptions(4);
 
     // Tells Vulkan from which binding the per-vertex data comes.
     attribute_descriptions[0].binding = 0;
@@ -66,13 +67,21 @@ struct Vertex {
         vk::Format::eR32G32Sfloat; // vec2 for texture coordinates
     attribute_descriptions[2].offset = offsetof(Vertex, tex_coord);
 
+    // normal attribute
+    attribute_descriptions[3].binding = 0;
+    attribute_descriptions[3].location = 3;
+    attribute_descriptions[3].format = vk::Format::eR32G32B32Sfloat;
+    attribute_descriptions[3].offset = offsetof(Vertex, normal);
+
 #ifndef NDEBUG
     std::cout << std::format("\nOffsets:\n"
                              "pos offset:         {}\n"
                              "color offset:       {}\n"
-                             "texCoord offset:    {}\n\n",
+                             "texCoord offset:    {}\n"
+                             "normal offset:      {}\n\n",
                              offsetof(Vertex, pos), offsetof(Vertex, color),
-                             offsetof(Vertex, tex_coord));
+                             offsetof(Vertex, tex_coord),
+                             offsetof(Vertex, normal));
 #endif
 
     return attribute_descriptions;
@@ -81,14 +90,13 @@ struct Vertex {
   // Operators to enable usage in hash tables:
   bool operator==(const Vertex &other) const {
     return pos == other.pos && color == other.color &&
-           tex_coord == other.tex_coord;
+           tex_coord == other.tex_coord && normal == other.normal;
   }
 };
 
 // loads mesh data from Obj and corresponding mtl files
 class ObjMesh {
 public:
-  // std::vector<float> vertices;
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
   std::vector<glm::vec3> v, vn;
@@ -123,7 +131,8 @@ template <> struct hash<ice::Vertex> {
     return ((hash<glm::vec3>()(vertex.pos) ^
              (hash<glm::vec3>()(vertex.color) << 1)) >>
             1) ^
-           (hash<glm::vec2>()(vertex.tex_coord) << 1);
+           (hash<glm::vec2>()(vertex.tex_coord) ^
+            (hash<glm::vec3>()(vertex.normal) << 1));
   }
 };
 } // namespace std

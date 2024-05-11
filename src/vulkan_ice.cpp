@@ -349,18 +349,25 @@ void VulkanIce::recreate_swapchain() {
 void VulkanIce::make_assets() {
   meshes = new MeshCollator();
 
-  std::unordered_map<MeshTypes, std::vector<const char *>> model_filenames = {
-      {MeshTypes::GROUND,
-       /* obj file path, material file path*/
-       {"resources/models/ground.obj", "resources/models/ground.mtl"}},
-      {MeshTypes::GIRL,
-       {"resources/models/girl.obj", "resources/models/girl.mtl"}},
-      {MeshTypes::SKULL,
-       {"resources/models/skull.obj", "resources/models/skull.mtl"}}};
+  // <mesh type , filenames, pre_transforms>
+  std::vector<std::tuple<MeshTypes, std::vector<const char *>, glm::mat4>>
+      model_inputs = {
+          {MeshTypes::GROUND,
+           /* obj file path, material file path*/
+           {"resources/models/ground.obj", "resources/models/ground.mtl"},
+           glm::mat4(1.0f)},
+          /* Rotate 180 degrees about the z axis*/
+          {MeshTypes::GIRL,
+           {"resources/models/girl.obj", "resources/models/girl.mtl"},
+           glm::rotate(glm::mat4(1.0f), glm::radians(180.0f),
+                       glm::vec3(0.0f, 0.0f, 1.0f))},
+          {MeshTypes::SKULL,
+           {"resources/models/skull.obj", "resources/models/skull.mtl"},
+           glm::mat4(1.0f)}};
 
-  // std::pair<MeshTypes, std::vector<const char*>> pair
-  for (const auto &[mesh_types, filenames] : model_filenames) {
-    ObjMesh model(filenames[0], filenames[1], glm::mat4(1.0f));
+  // std::pair<MeshTypes, std::vector<const char*>, glm::mat4> pair
+  for (const auto &[mesh_types, filenames, pre_transform] : model_inputs) {
+    ObjMesh model(filenames[0], filenames[1], pre_transform);
     meshes->consume(mesh_types, model.vertices, model.indices);
   }
 
