@@ -17,7 +17,7 @@ struct GameObject {
 };
 
 //--------- Assets -------------//
-enum class MeshTypes { TRIANGLE, SQUARE, STAR };
+enum class MeshTypes { GROUND, GIRL, SKULL };
 
 /**
  * Scene
@@ -27,9 +27,8 @@ class Scene {
 
 public:
   Scene();
-  std::vector<glm::vec3> triangle_positions;
-  std::vector<glm::vec3> square_positions;
-  std::vector<glm::vec3> star_positions;
+
+  std::unordered_map<MeshTypes, std::vector<glm::vec3>> positions;
 };
 
 } // namespace ice

@@ -4,28 +4,21 @@ namespace ice {
 
 Scene::Scene() {
 
-  float x = -0.3f;
-  for (float z = -1.0f; z <= 1.0f; z += 0.2f) {
-    for (float y = -1.0f; y <= 1.0f; y += 0.2f) {
+  positions.insert({MeshTypes::GROUND, {}});
+  positions.insert({MeshTypes::GIRL, {}});
+  positions.insert({MeshTypes::SKULL, {}});
 
-      triangle_positions.push_back(glm::vec3(x, y, z));
-    }
-  }
+  // One ground and girl, 2 skulls
 
-  x = 0.0f;
-  for (float z = -1.0f; z <= 1.0f; z += 0.2f) {
-    for (float y = -1.0f; y < 1.0f; y += 0.2f) {
+  // model transorm
+  // glm::vec3 {distance away from cam, left/right of cam, height above cam
+  // level}
 
-      square_positions.push_back(glm::vec3(x, y, z));
-    }
-  }
-
-  x = 0.3f;
-  for (float z = -1.0f; z <= 1.0f; z += 0.2f) {
-    for (float y = -1.0f; y < 1.0f; y += 0.2f) {
-
-      star_positions.push_back(glm::vec3(x, y, z));
-    }
-  }
+  // Ground is pushed forward in front of the camera, dead centre with the cam,
+  // and on the ground i.e height of zero
+  positions[MeshTypes::GROUND].push_back(glm::vec3(10.0f, 0.0f, 0.0f));
+  positions[MeshTypes::GIRL].push_back(glm::vec3(17.0f, 0.0f, 0.0f));
+  positions[MeshTypes::SKULL].push_back(glm::vec3(15.0f, -5.0f, 1.0f));
+  positions[MeshTypes::SKULL].push_back(glm::vec3(15.0f, 5.0f, 1.0f));
 }
 } // namespace ice

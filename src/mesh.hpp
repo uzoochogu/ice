@@ -84,6 +84,34 @@ struct Vertex {
            tex_coord == other.tex_coord;
   }
 };
+
+// loads mesh data from Obj and corresponding mtl files
+class ObjMesh {
+public:
+  // std::vector<float> vertices;
+  std::vector<Vertex> vertices;
+  std::vector<uint32_t> indices;
+  std::vector<glm::vec3> v, vn;
+  std::vector<glm::vec2> vt;
+  std::unordered_map<std::string, uint32_t> history;
+  std::unordered_map<std::string, glm::vec3> color_lookup;
+  glm::vec3 brush_color;
+  glm::mat4 pre_transform;
+
+  ObjMesh(const char *obj_filepath, const char *mtl_filepath,
+          glm::mat4 pre_transform);
+
+  void read_vertex_data(const std::vector<std::string> &words);
+
+  void read_texcoord_data(const std::vector<std::string> &words);
+
+  void read_normal_data(const std::vector<std::string> &words);
+
+  void read_face_data(const std::vector<std::string> &words);
+
+  void read_corner(const std::string &vertex_description);
+};
+
 } // namespace ice
 
 // Hash calculation  for Vertex

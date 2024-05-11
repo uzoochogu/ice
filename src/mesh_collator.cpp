@@ -5,12 +5,12 @@ namespace ice {
 #ifndef NDEBUG
 std::string to_string(MeshTypes type) {
   switch (type) {
-  case MeshTypes::TRIANGLE:
-    return "Triangle";
-  case MeshTypes::SQUARE:
-    return "Square";
-  case MeshTypes::STAR:
-    return "Star";
+  case MeshTypes::GROUND:
+    return "Ground";
+  case MeshTypes::GIRL:
+    return "Girl";
+  case MeshTypes::SKULL:
+    return "Skull";
   }
   return "Invalid type";
 }
@@ -112,6 +112,10 @@ void MeshCollator::finalize(
   // destroy staging buffer
   logical_device.destroyBuffer(staging_buffer.buffer);
   logical_device.freeMemory(staging_buffer.buffer_memory);
+
+  // destroy resources
+  vertex_lump.clear();
+  index_lump.clear();
 
   if (result != vk::Result::eSuccess) {
     throw std::runtime_error(

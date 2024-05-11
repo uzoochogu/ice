@@ -349,65 +349,21 @@ void VulkanIce::recreate_swapchain() {
 void VulkanIce::make_assets() {
   meshes = new MeshCollator();
 
-  // clang-format off
-  std::vector<Vertex> vertices = {{.pos       = glm::vec3(0.0f, -0.05f, 0.0f),
-                                   .color     = glm::vec3(1.0f, 1.0f, 1.0f),
-      /* 0 */                      .tex_coord = glm::vec2(0.5f, 0.0f)},
-                                  {.pos       = glm::vec3(0.05f, 0.05f, 0.0f),
-                                   .color     = glm::vec3(1.0f, 1.0f, 1.0f),
-      /* 1 */                      .tex_coord = glm::vec2(1.0f, 1.0f)},
-                                  {.pos       = glm::vec3(-0.05f, 0.05f, 0.0f),
-                                   .color     = glm::vec3(1.0f, 1.0f, 1.0f),
-      /* 2 */                      .tex_coord = glm::vec2(0.0f, 1.0f)}};
-  
- 	std::vector<uint32_t> indices = { {
-			0, 1, 2
-	} };
+  std::unordered_map<MeshTypes, std::vector<const char *>> model_filenames = {
+      {MeshTypes::GROUND,
+       /* obj file path, material file path*/
+       {"resources/models/ground.obj", "resources/models/ground.mtl"}},
+      {MeshTypes::GIRL,
+       {"resources/models/girl.obj", "resources/models/girl.mtl"}},
+      {MeshTypes::SKULL,
+       {"resources/models/skull.obj", "resources/models/skull.mtl"}}};
 
-  MeshTypes type = MeshTypes::TRIANGLE;
-  meshes->consume(type, vertices, indices);
+  // std::pair<MeshTypes, std::vector<const char*>> pair
+  for (const auto &[mesh_types, filenames] : model_filenames) {
+    ObjMesh model(filenames[0], filenames[1], glm::mat4(1.0f));
+    meshes->consume(mesh_types, model.vertices, model.indices);
+  }
 
-  vertices = {
-{.pos{-0.05f, 0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.0f, 1.0f} }, // 0
-{.pos{-0.05f, -0.05f, 0.0f},.color{1.0f, 1.0f, 1.0f}, .tex_coord{0.0f, 0.0f} }, // 1
-{.pos{0.05f, -0.05f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{1.0f, 0.0f} }, // 2
-{.pos{0.05f, 0.05f, 0.0f},  .color{1.0f, 1.0f, 1.0f}, .tex_coord{1.0f, 1.0f} }  // 3
-};
-
-	indices = { {
-			0, 1, 2,
-			2, 3, 0
-	} };
-  type = MeshTypes::SQUARE;
-  meshes->consume(type, vertices, indices);
-
-  vertices = {
-{.pos{-0.05f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.0f, 0.25f}}, // 0
-{.pos{-0.02f, -0.025f, 0.0f}, .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.3f, 0.25f}}, // 1
-{.pos{-0.03f, 0.0f, 0.0f}   , .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.2f,  0.5f}}, // 2
-{.pos{0.0f, -0.05f, 0.0f}   , .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.5f,  0.0f}}, // 3
-{.pos{0.02f, -0.025f, 0.0f} , .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.7f, 0.25f}}, // 4
-{.pos{0.05f, -0.025f, 0.0f} , .color{1.0f, 1.0f, 1.0f}, .tex_coord{1.0f, 0.25f}}, // 5
-{.pos{0.03f, 0.0f, 0.0f}    , .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.8f,  0.5f}}, // 6
-{.pos{0.04f, 0.05f, 0.0f}   , .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.9f,  1.0f}}, // 7
-{.pos{0.0f, 0.01f, 0.0f}    , .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.5f,  0.6f}}, // 8
-{.pos{-0.04f, 0.05f, 0.0f}  , .color{1.0f, 1.0f, 1.0f}, .tex_coord{0.1f,  1.0f}}  // 9
-};
-
-  indices = { {
-			0, 1, 2, 
-			1, 3, 4, 
-			2, 1, 4, 
-			4, 5, 6, 
-			2, 4, 6, 
-			6, 7, 8, 
-			2, 6, 8, 
-			2, 8, 9  
-	} };
-
-  type = MeshTypes::STAR;
-  meshes->consume(type, vertices, indices);
-  // clang-format on
   VertexBufferFinalizationInput finalization_info{
       .logical_device = device,
       .physical_device = physical_device,
@@ -416,11 +372,11 @@ void VulkanIce::make_assets() {
 
   meshes->finalize(finalization_info);
 
-  // Materials
+  // Materials (Textures)
   std::unordered_map<MeshTypes, const char *> filenames = {
-      {MeshTypes::TRIANGLE, "resources/textures/david.jpg"},
-      {MeshTypes::SQUARE, "resources/textures/haus.jpg"},
-      {MeshTypes::STAR, "resources/textures/viking_room.png"}};
+      {MeshTypes::GROUND, "resources/textures/ground.jpg"},
+      {MeshTypes::GIRL, "resources/textures/none.png"},
+      {MeshTypes::SKULL, "resources/textures/skull.png"}};
 
   // mesh descriptor pool
   mesh_descriptor_pool =
@@ -444,16 +400,20 @@ void VulkanIce::make_assets() {
 
 void VulkanIce::prepare_frame(std::uint32_t image_index, Scene *scene) {
 
-  glm::vec3 eye = {1.0f, 0.0f, -1.0f};
-  glm::vec3 center = {0.0f, 0.0f, 0.0f};
-  glm::vec3 up = {0.0f, 0.0f, -1.0f};
+  /* x =0 and a height of 1*/
+  glm::vec3 eye = {0.0f, 0.0f, 1.0f};
+  // { forwards, , inline with us }
+  glm::vec3 center = {1.0f, 0.0f, 1.0f};
+  // { z is up  }
+  glm::vec3 up = {0.0f, 0.0f, 1.0f};
   glm::mat4 view = glm::lookAt(eye, center, up);
 
+  // increase far distance to prevent clipping
   glm::mat4 projection =
       glm::perspective(glm::radians(45.0f),
                        static_cast<float>(swapchain_extent.width) /
                            static_cast<float>(swapchain_extent.height),
-                       0.1f, 10.0f);
+                       0.1f, 100.0f);
   projection[1][1] *= -1;
 
   SwapChainFrame &_frame = swapchain_frames[image_index];
@@ -464,14 +424,10 @@ void VulkanIce::prepare_frame(std::uint32_t image_index, Scene *scene) {
 
   // model transforms info
   size_t i = 0;
-  for (glm::vec3 &position : scene->triangle_positions) {
-    _frame.model_transforms[i++] = glm::translate(glm::mat4(1.0f), position);
-  }
-  for (glm::vec3 &position : scene->square_positions) {
-    _frame.model_transforms[i++] = glm::translate(glm::mat4(1.0f), position);
-  }
-  for (glm::vec3 position : scene->star_positions) {
-    _frame.model_transforms[i++] = glm::translate(glm::mat4(1.0f), position);
+  for (std::pair<MeshTypes, std::vector<glm::vec3>> pair : scene->positions) {
+    for (glm::vec3 &position : pair.second) {
+      _frame.model_transforms[i++] = glm::translate(glm::mat4(1.0f), position);
+    }
   }
 
   memcpy(_frame.model_buffer_write_location, _frame.model_transforms.data(),
@@ -637,16 +593,10 @@ void VulkanIce::record_draw_commands(vk::CommandBuffer command_buffer,
   // Triangles
   std::uint32_t start_instance = 0;
 
-  render_mesh(command_buffer, MeshTypes::TRIANGLE, start_instance,
-              static_cast<uint32_t>(scene->triangle_positions.size()));
-
-  // squares
-  render_mesh(command_buffer, MeshTypes::SQUARE, start_instance,
-              static_cast<uint32_t>(scene->square_positions.size()));
-
-  // stars
-  render_mesh(command_buffer, MeshTypes::STAR, start_instance,
-              static_cast<uint32_t>(scene->star_positions.size()));
+  for (const auto &[mesh_types, positions] : scene->positions) {
+    render_mesh(command_buffer, mesh_types, start_instance,
+                static_cast<uint32_t>(positions.size()));
+  }
 
   command_buffer.endRenderPass();
 

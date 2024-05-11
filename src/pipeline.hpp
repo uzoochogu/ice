@@ -192,7 +192,7 @@ make_graphics_pipeline(const GraphicsPipelineInBundle &specification) {
       .rasterizerDiscardEnable = vk::False,
       .polygonMode = vk::PolygonMode::eFill,
       .cullMode = vk::CullModeFlagBits::eBack,
-      .frontFace = vk::FrontFace::eClockwise, /* eCounterClockwise*/
+      .frontFace = vk::FrontFace::eCounterClockwise, /* eClockwise*/
       .depthBiasEnable = vk::False,
       .depthBiasConstantFactor = 0.0f,
       .depthBiasClamp = 0.0f,
