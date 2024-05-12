@@ -12,7 +12,7 @@ inline void create_surface(VkInstance instance, GLFWwindow *window,
                            const VkAllocationCallbacks *allocator,
                            VkSurfaceKHR *surface) {
   // VkInstance, GLFW window pointer, custom allocator and pointer to
-  // VksurfaceKHR
+  // VkSurfaceKHR
   if (glfwCreateWindowSurface(instance, window, nullptr, surface) !=
       VK_SUCCESS) {
     throw std::runtime_error("failed to create window surface!");

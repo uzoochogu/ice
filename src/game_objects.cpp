@@ -10,7 +10,7 @@ Scene::Scene() {
 
   // One ground and girl, 2 skulls
 
-  // model transorm
+  // model transform
   // glm::vec3 {distance away from cam, left/right of cam, height above cam
   // level}
 

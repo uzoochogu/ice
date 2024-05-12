@@ -70,12 +70,12 @@ inline vk::ShaderModule create_shader_module(std::string filename,
     // Triangulation already in effect, 3 vertices per face.
     // index contains tinyobj::index_t::vertex_index, ::normal::index and
     // texcoord_index. We use these indices to look up actual vertex
-    // attributes in the attrib arrrays
+    // attributes in the attrib arrays
     for (const auto &index : shape.mesh.indices) {
       Vertex vertex{};
 
       if (index.vertex_index >= 0) {
-        // multply by 3 and offset because it is an array of floats and not
+        // multiply by 3 and offset because it is an array of floats and not
         // like glm::vec3
         vertex.pos = {attrib.vertices[3 * index.vertex_index + 0],
                       attrib.vertices[3 * index.vertex_index + 1],

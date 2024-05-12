@@ -22,7 +22,7 @@ find_package(tinyobjloader REQUIRED)
 message(STATUS "Directory: ${Vulkan_INCLUDE_DIRS}")
 message(STATUS "Directory: ${Vulkan_LIBRARIES}")
 
-file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp)
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/src/*)
 
 # add_executable(${PROJECT_NAME} ${SOURCES})
 add_executable (first_app ${SOURCES})

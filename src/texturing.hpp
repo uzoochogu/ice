@@ -151,7 +151,7 @@ inline void generateMipmaps(VkPhysicalDevice physicalDevice, VkImage image,
 inline void create_texture_image(std::string TEXTURE_PATH) {
   int texWidth, texHeight, texChannels;
   // path, out variables for width, height, actual channels channels and then
-  // the number of cahnnels to load.
+  // the number of channels to load.
   // STBI_rgb_alpha forces loading with alpha channel even if it is not
   // present. Pointer returned is the first element in the array of pixel
   // values. The pixels are laid out row by row with 4 bytes per pixel. In the
@@ -190,7 +190,7 @@ inline void create_texture_image(std::string TEXTURE_PATH) {
   stbi_image_free(pixels); // frees image array
 
   // Format - use same format as the pixels in the buffer, else copy operation
-  // will fail. Tiling - We choose for texels are laid out in an implentation
+  // will fail. Tiling - We choose for texels are laid out in an implementation
   // defined order
   // (TILING_OPTIMAL) for optimal access and not TILING_LINEAR( row-major in
   // our pixel array), since we are using a staging buffer we can use optimal

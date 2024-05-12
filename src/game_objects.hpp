@@ -11,7 +11,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace ice {
-// Data representing a gameobject e.g a model
+// Data representing a game object e.g a model
 struct GameObject {
   glm::mat4 model;
 };

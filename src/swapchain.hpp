@@ -96,7 +96,7 @@ inline vk::SurfaceFormatKHR choose_swap_surface_format(
     }
   }
 
-  // Just choose the first if the most preferred is not availble
+  // Just choose the first if the most preferred is not available
   return available_formats[0];
 }
 
@@ -132,7 +132,7 @@ choose_swap_present_mode(const std::vector<vk::PresentModeKHR> &present_modes) {
   for (const auto &present_mode : present_modes) {
 
     if (present_mode ==
-        vk::PresentModeKHR::eMailbox) { // aka Tripple Buffering, low latency
+        vk::PresentModeKHR::eMailbox) { // aka Triple Buffering, low latency
       return present_mode;
     }
   }
@@ -147,7 +147,7 @@ create_swapchain_bundle(vk::PhysicalDevice physical_device,
                         int width, int height,
                         vk::SwapchainKHR *old_swapchain = nullptr) {
 
-  // Get Swapchain suport info
+  // Get Swapchain support info
   SwapChainSupportDetails swapchain_support =
       query_swapchain_support(physical_device, surface);
 

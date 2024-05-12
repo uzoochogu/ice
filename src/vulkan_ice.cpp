@@ -229,8 +229,6 @@ void VulkanIce::setup_swapchain(vk::SwapchainKHR *old_swapchain) {
 void VulkanIce::setup_descriptor_set_layouts() {
   // Populate DescriptorSetLayoutData
   // UBO Binding 0
-  frame_set_layout_bindings;
-
   frame_set_layout_bindings = {.count = 2};
   frame_set_layout_bindings.indices.push_back(0);
   frame_set_layout_bindings.types.push_back(vk::DescriptorType::eUniformBuffer);
@@ -481,7 +479,7 @@ void VulkanIce::render(Scene *scene) {
 
   vk::CommandBuffer command_buffer =
       swapchain_frames[current_frame]
-          .command_buffer; // was swapchain_frames[image_index].comand_buffer
+          .command_buffer; // was swapchain_frames[image_index].command_buffer
 
   command_buffer.reset();
 

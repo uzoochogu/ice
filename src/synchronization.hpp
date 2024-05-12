@@ -7,7 +7,7 @@ namespace ice {
 
 inline vk::Semaphore make_semaphore(vk::Device device) {
 #ifndef NDEBUG
-  std::cout << "Made a Semphore" << std::endl;
+  std::cout << "Made a Semaphore" << std::endl;
 #endif
   vk::SemaphoreCreateInfo semaphoreInfo{.flags = vk::SemaphoreCreateFlags()};
 
