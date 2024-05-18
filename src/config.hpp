@@ -15,6 +15,10 @@
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
 #include <vulkan/vulkan.hpp>
 
+// Pipeline types used in the engine
+enum class PipelineType { SKY, STANDARD };
+
+
 inline std::vector<std::string> split(std::string line, std::string delimiter) {
 
   std::vector<std::string> split_line;

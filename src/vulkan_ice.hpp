@@ -7,6 +7,8 @@
 #include "commands.hpp"
 #include "descriptors.hpp"
 #include "framebuffer.hpp"
+#include "images/ice_cube_map.hpp"
+#include "images/ice_texture.hpp"
 #include "mesh_collator.hpp"
 #include "pipeline.hpp"
 #include "swapchain.hpp"
@@ -78,6 +80,7 @@ private:
 
   // device setup
   void make_device();
+  void setup_pipeline_bundles();
   void setup_swapchain(vk::SwapchainKHR *old_swapchain = nullptr);
   void recreate_swapchain();
 
@@ -96,8 +99,10 @@ private:
   // frame and scene prep
   void prepare_frame(std::uint32_t image_index, Scene *scene);
   void prepare_scene(vk::CommandBuffer command_buffer);
-  void record_draw_commands(vk::CommandBuffer command_buffer,
-                            uint32_t image_index, Scene *scene);
+  void record_sky_draw_commands(vk::CommandBuffer command_buffer,
+                                uint32_t image_index, Scene *scene);
+  void record_scene_draw_commands(vk::CommandBuffer command_buffer,
+                                  uint32_t image_index, Scene *scene);
 
   // cleanup
   void destroy_swapchain_bundle(bool include_swapchain = true);
@@ -119,12 +124,13 @@ private:
   // std::unique_ptr<MeshCollator> meshes;
   MeshCollator *meshes;
   std::unordered_map<MeshTypes, ice_image::Texture *> materials;
+  ice_image::CubeMap *cube_map;
 
   // descriptor-related variables
-  vk::DescriptorSetLayout frame_set_layout;
+  std::unordered_map<PipelineType, vk::DescriptorSetLayout> frame_set_layout;
   vk::DescriptorPool frame_descriptor_pool;
   DescriptorSetLayoutData frame_set_layout_bindings;
-  vk::DescriptorSetLayout mesh_set_layout;
+  std::unordered_map<PipelineType, vk::DescriptorSetLayout> mesh_set_layout;
   vk::DescriptorPool mesh_descriptor_pool;
   DescriptorSetLayoutData mesh_set_layout_bindings;
 
@@ -133,9 +139,11 @@ private:
   vk::CommandBuffer main_command_buffer;
 
   // pipeline-related variables
-  vk::PipelineLayout pipeline_layout;
-  vk::RenderPass renderpass;
-  vk::Pipeline pipeline;
+  std::vector<PipelineType> pipeline_types = {PipelineType::SKY,
+                                              PipelineType::STANDARD};
+  std::unordered_map<PipelineType, vk::PipelineLayout> pipeline_layout;
+  std::unordered_map<PipelineType, vk::RenderPass> renderpass;
+  std::unordered_map<PipelineType, vk::Pipeline> pipeline;
 
   // device-related
   vk::SwapchainKHR swapchain{nullptr};

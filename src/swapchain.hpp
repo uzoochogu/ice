@@ -23,7 +23,7 @@ public:
   // swapchain essentials
   vk::Image image;
   vk::ImageView image_view;
-  vk::Framebuffer framebuffer;
+  std::unordered_map<PipelineType, vk::Framebuffer> framebuffer;
   vk::Image depth_buffer;
   vk::DeviceMemory depth_buffer_memory;
   vk::ImageView depth_buffer_view;
@@ -37,21 +37,31 @@ public:
   vk::Fence in_flight_fence;
 
   // frame resources
-  UBO camera_data;
-  BufferBundle camera_data_buffer;
-  void *camera_data_write_location;
+  CameraMatrices camera_matrix_data;
+  BufferBundle camera_matrix_buffer;
+  void *camera_matrix_write_location;
+
+  CameraVectors camera_vector_data;
+  BufferBundle camera_vector_buffer;
+  void *camera_vector_write_location;
+
   std::vector<glm::mat4> model_transforms;
   BufferBundle model_buffer;
   void *model_buffer_write_location;
 
   // Resource Descriptors
-  vk::DescriptorBufferInfo uniform_buffer_descriptor_info;
-  vk::DescriptorBufferInfo model_buffer_descriptor_info;
-  vk::DescriptorSet descriptor_set;
+  vk::DescriptorBufferInfo camera_vector_descriptor_info, camera_matrix_descriptor_info;
+  vk::DescriptorBufferInfo ssbo_descriptor_info;
+  std::unordered_map<PipelineType, vk::DescriptorSet> descriptor_sets;
+
+	//Write Operations
+	std::vector<vk::WriteDescriptorSet> write_ops;
 
   void make_descriptor_resources();
 
   void make_depth_resources();
+
+  void record_write_operations();
 
   void write_descriptor_set();
 

@@ -1,5 +1,7 @@
 #include "vulkan_ice.hpp"
-#include "images/ice_image.hpp"
+#include "config.hpp"
+#include "mesh.hpp"
+#include "ubo.hpp"
 
 namespace ice {
 VulkanIce::VulkanIce(IceWindow &window) : window{window} {
@@ -17,22 +19,7 @@ VulkanIce::VulkanIce(IceWindow &window) : window{window} {
   setup_descriptor_set_layouts();
 
   // Render pass and Pipeline creation
-  GraphicsPipelineInBundle spec{
-      .device = device,
-      .vertex_filepath = "resources/shaders/vert.spv",
-      .fragment_filepath = "resources/shaders/frag.spv",
-      .swapchain_extent = swapchain_extent,
-      .swapchain_image_format = swapchain_format,
-      .swapchain_depth_format =
-          swapchain_frames[0].depth_format /* at least 1 is guaranteed*/,
-
-      .descriptor_set_layouts = {frame_set_layout, mesh_set_layout}};
-
-  GraphicsPipelineOutBundle graphics_bundle = make_graphics_pipeline(spec);
-
-  pipeline_layout = std::move(graphics_bundle.layout);
-  renderpass = std::move(graphics_bundle.renderpass);
-  pipeline = std::move(graphics_bundle.pipeline);
+  setup_pipeline_bundles();
 
   // populate frame buffers
   setup_framebuffers();
@@ -54,14 +41,19 @@ VulkanIce::~VulkanIce() {
 
   device.destroyCommandPool(command_pool);
 
-  device.destroyPipeline(pipeline);
-  device.destroyPipelineLayout(pipeline_layout);
-  device.destroyRenderPass(renderpass);
+  for (PipelineType pipeline_type : pipeline_types) {
+    device.destroyPipeline(pipeline[pipeline_type]);
+    device.destroyPipelineLayout(pipeline_layout[pipeline_type]);
+    device.destroyRenderPass(renderpass[pipeline_type]);
+  }
 
   destroy_swapchain_bundle();
 
-  device.destroyDescriptorSetLayout(frame_set_layout);
-  device.destroyDescriptorSetLayout(mesh_set_layout);
+  for (PipelineType pipeline_type : pipeline_types) {
+    device.destroyDescriptorSetLayout(frame_set_layout[pipeline_type]);
+    device.destroyDescriptorSetLayout(mesh_set_layout[pipeline_type]);
+  }
+
   device.destroyDescriptorPool(mesh_descriptor_pool);
 
   delete meshes;
@@ -69,6 +61,8 @@ VulkanIce::~VulkanIce() {
   for (const auto &[key, texture] : materials) {
     delete texture;
   }
+
+  delete cube_map;
 
   device.destroy();
 
@@ -229,20 +223,25 @@ void VulkanIce::setup_swapchain(vk::SwapchainKHR *old_swapchain) {
 void VulkanIce::setup_descriptor_set_layouts() {
   // Populate DescriptorSetLayoutData
   // UBO Binding 0
-  frame_set_layout_bindings = {.count = 2};
+  frame_set_layout_bindings = {.count = 1};
   frame_set_layout_bindings.indices.push_back(0);
   frame_set_layout_bindings.types.push_back(vk::DescriptorType::eUniformBuffer);
   frame_set_layout_bindings.descriptor_counts.push_back(1);
   frame_set_layout_bindings.stages.push_back(vk::ShaderStageFlagBits::eVertex);
 
+  // SKY PIPELINE needs only 1 uniform binding
+  frame_set_layout[PipelineType::SKY] =
+      make_descriptor_set_layout(device, frame_set_layout_bindings);
+
   // model transforms binding 1
+  frame_set_layout_bindings.count = 2;
   frame_set_layout_bindings.indices.push_back(1);
   frame_set_layout_bindings.types.push_back(vk::DescriptorType::eStorageBuffer);
   frame_set_layout_bindings.descriptor_counts.push_back(1);
   frame_set_layout_bindings.stages.push_back(vk::ShaderStageFlagBits::eVertex);
 
-  // set and bindings once per frame
-  frame_set_layout =
+  // set and bindings once per frame for STANDARD PIPELINE
+  frame_set_layout[PipelineType::STANDARD] =
       make_descriptor_set_layout(device, frame_set_layout_bindings);
 
   // bindings for individual draw calls
@@ -254,8 +253,49 @@ void VulkanIce::setup_descriptor_set_layouts() {
   mesh_set_layout_bindings.descriptor_counts.push_back(1);
   mesh_set_layout_bindings.stages.push_back(vk::ShaderStageFlagBits::eFragment);
 
-  mesh_set_layout =
+  mesh_set_layout[PipelineType::SKY] =
       make_descriptor_set_layout(device, mesh_set_layout_bindings);
+  mesh_set_layout[PipelineType::STANDARD] =
+      make_descriptor_set_layout(device, mesh_set_layout_bindings);
+}
+
+void VulkanIce::setup_pipeline_bundles() {
+  // SKY PIPELINE
+  // load and store op is don't care, will present.
+  GraphicsPipelineInBundle spec{
+      .device = device,
+      .vertex_filepath = "resources/shaders/sky_vert.spv",
+      .fragment_filepath = "resources/shaders/sky_frag.spv",
+      .swapchain_extent = swapchain_extent,
+      .swapchain_image_format = {swapchain_format},
+      .descriptor_set_layouts = {frame_set_layout[PipelineType::SKY],
+                                 mesh_set_layout[PipelineType::SKY]},
+      .load_op = vk::AttachmentLoadOp::eDontCare,
+      .initial_layout = vk::ImageLayout::eUndefined};
+
+  GraphicsPipelineOutBundle graphics_bundle = make_graphics_pipeline(spec);
+
+  pipeline_layout[PipelineType::SKY] = std::move(graphics_bundle.layout);
+  renderpass[PipelineType::SKY] = std::move(graphics_bundle.renderpass);
+  pipeline[PipelineType::SKY] = std::move(graphics_bundle.pipeline);
+
+  // STANDARD PIPELINE
+  spec.vertex_filepath = "resources/shaders/vert.spv";
+  spec.fragment_filepath = "resources/shaders/frag.spv";
+  spec.attribute_descriptions = Vertex::get_attribute_descriptions();
+  spec.binding_description = Vertex::get_binding_description();
+  spec.swapchain_depth_format = {
+      swapchain_frames[0].depth_format} /* at least 1 is guaranteed*/;
+  spec.descriptor_set_layouts = {frame_set_layout[PipelineType::STANDARD],
+                                 mesh_set_layout[PipelineType::STANDARD]};
+  spec.load_op = vk::AttachmentLoadOp::eLoad;
+  spec.initial_layout = vk::ImageLayout::ePresentSrcKHR;
+
+  graphics_bundle = make_graphics_pipeline(spec);
+
+  pipeline_layout[PipelineType::STANDARD] = std::move(graphics_bundle.layout);
+  renderpass[PipelineType::STANDARD] = std::move(graphics_bundle.renderpass);
+  pipeline[PipelineType::STANDARD] = std::move(graphics_bundle.pipeline);
 }
 
 void VulkanIce::setup_framebuffers() {
@@ -281,9 +321,10 @@ void VulkanIce::setup_command_buffers() {
 
 // Sets up frame resources like sync objects, UBOs etc
 void VulkanIce::setup_frame_resources() {
-  // A descriptor set per frame
+  const std::uint32_t descriptor_set_per_frame = 2;
   frame_descriptor_pool = make_descriptor_pool(
-      device, static_cast<uint32_t>(swapchain_frames.size()),
+      device,
+      descriptor_set_per_frame * static_cast<uint32_t>(swapchain_frames.size()),
       frame_set_layout_bindings);
 
   for (SwapChainFrame &frame : swapchain_frames) {
@@ -292,8 +333,13 @@ void VulkanIce::setup_frame_resources() {
     frame.render_finished = make_semaphore(device);
 
     frame.make_descriptor_resources();
-    frame.descriptor_set = allocate_descriptor_sets(
-        device, frame_descriptor_pool, frame_set_layout);
+    frame.descriptor_sets[PipelineType::SKY] = allocate_descriptor_sets(
+        device, frame_descriptor_pool, frame_set_layout[PipelineType::SKY]);
+    frame.descriptor_sets[PipelineType::STANDARD] =
+        allocate_descriptor_sets(device, frame_descriptor_pool,
+                                 frame_set_layout[PipelineType::STANDARD]);
+
+    frame.record_write_operations();
   }
 }
 
@@ -345,8 +391,9 @@ void VulkanIce::recreate_swapchain() {
 }
 
 void VulkanIce::make_assets() {
-  meshes = new MeshCollator();
 
+  // Meshes
+  meshes = new MeshCollator();
   // <mesh type , filenames, pre_transforms>
   std::vector<std::tuple<MeshTypes, std::vector<const char *>, glm::mat4>>
       model_inputs = {
@@ -383,35 +430,68 @@ void VulkanIce::make_assets() {
       {MeshTypes::GIRL, "resources/textures/none.png"},
       {MeshTypes::SKULL, "resources/textures/skull.png"}};
 
-  // mesh descriptor pool
+  // mesh descriptor pool to allocate sets
   mesh_descriptor_pool =
-      make_descriptor_pool(device, static_cast<uint32_t>(filenames.size()),
-                           mesh_set_layout_bindings);
+      make_descriptor_pool(device, static_cast<uint32_t>(filenames.size()) + 1,
+                           mesh_set_layout_bindings); // extra set for cube map
 
   ice_image::TextureCreationInput texture_info{
       .physical_device = physical_device,
       .logical_device = device,
       .command_buffer = main_command_buffer,
       .queue = graphics_queue,
-      .layout = mesh_set_layout,
+      .layout = mesh_set_layout[PipelineType::STANDARD],
       .descriptor_pool = mesh_descriptor_pool};
 
   for (const auto &[object, filename] : filenames) {
-    texture_info.filename = filename;
+    texture_info.filenames = {filename};
     materials[object] = new ice_image::Texture(texture_info);
   }
+
+  // Sky Texture
+  texture_info.layout = mesh_set_layout[PipelineType::SKY];
+  /* texture_info.descriptor_pool = mesh_descriptor_pool; */
+  texture_info.filenames = {{
+      "resources/textures/sky_front.png",  // x+
+      "resources/textures/sky_back.png",   // x-
+      "resources/textures/sky_left.png",   // y+
+      "resources/textures/sky_right.png",  // y-
+      "resources/textures/sky_bottom.png", // z+
+      "resources/textures/sky_top.png",    // z-
+  }};
+  cube_map = new ice_image::CubeMap(texture_info);
+
+#ifndef NDEBUG
   std::cout << "Finished making assets" << std::endl;
+#endif
 }
 
 void VulkanIce::prepare_frame(std::uint32_t image_index, Scene *scene) {
 
-  /* x =0 and a height of 1*/
-  glm::vec3 eye = {0.0f, 0.0f, 1.0f};
-  // { forwards, , inline with us }
-  glm::vec3 center = {1.0f, 0.0f, 1.0f};
-  // { z is up  }
-  glm::vec3 up = {0.0f, 0.0f, 1.0f};
-  glm::mat4 view = glm::lookAt(eye, center, up);
+  SwapChainFrame &_frame =
+      swapchain_frames[image_index]; // swapchain frame alias
+
+  // clang-format off
+
+  // prep camera vectors
+  glm::vec4 cam_vec_forwards = {1.0f, 0.0f, 0.0f, 0.0f};
+  glm::vec4 cam_vec_right    = {0.0f, -1.0f, 0.0f, 0.0f};
+  glm::vec4 cam_vec_up       = {0.0f, 0.0f, 1.0f, 0.0f}; // z  up
+  _frame.camera_vector_data = {
+                                .forwards = cam_vec_forwards,
+                                .right = cam_vec_right,
+                                .up = cam_vec_up,
+  };
+
+  memcpy(_frame.camera_vector_write_location, &(_frame.camera_vector_data),
+         sizeof(CameraVectors));
+
+  glm::vec3 eye    = {-1.0f, 0.0f, 5.0f};
+  glm::vec3 center = { 1.0f, 0.0f, 5.0f }; //{ forwards, , slightly above }
+  glm::vec3 up     = {0.0f, 0.0f, 1.0f};
+  glm::mat4 view   = glm::lookAt(eye, center, up);
+
+  // clang-format on
 
   // increase far distance to prevent clipping
   glm::mat4 projection =
@@ -421,11 +501,11 @@ void VulkanIce::prepare_frame(std::uint32_t image_index, Scene *scene) {
                        0.1f, 100.0f);
   projection[1][1] *= -1;
 
-  SwapChainFrame &_frame = swapchain_frames[image_index];
-  _frame.camera_data = {.view = view,
-                        .projection = projection,
-                        .view_projection = projection * view};
-  memcpy(_frame.camera_data_write_location, &(_frame.camera_data), sizeof(UBO));
+  _frame.camera_matrix_data = {.view = view,
+                               .projection = projection,
+                               .view_projection = projection * view};
+  memcpy(_frame.camera_matrix_write_location, &(_frame.camera_matrix_data),
+         sizeof(CameraMatrices));
 
   // model transforms info
   size_t i = 0;
@@ -485,7 +565,25 @@ void VulkanIce::render(Scene *scene) {
 
   prepare_frame(image_index, scene);
 
-  record_draw_commands(command_buffer, image_index, scene);
+  // begin recording
+  vk::CommandBufferBeginInfo begin_info = {};
+
+  try {
+    command_buffer.begin(begin_info);
+  } catch (vk::SystemError err) {
+    throw std::runtime_error("Failed to begin recording command buffer!");
+  }
+  // record events
+  record_sky_draw_commands(command_buffer, image_index, scene);
+  record_scene_draw_commands(command_buffer, image_index, scene);
+
+  // end
+  try {
+    command_buffer.end();
+  } catch (vk::SystemError err) {
+
+    throw std::runtime_error("failed to record command buffer!");
+  }
 
   vk::SubmitInfo submit_info = {};
 
@@ -548,22 +646,15 @@ void VulkanIce::render_mesh(vk::CommandBuffer command_buffer,
                             uint32_t instance_count) {
   int index_count = meshes->index_counts.find(mesh_type)->second;
   int first_index = meshes->index_lump_offsets.find(mesh_type)->second;
-  materials[mesh_type]->use(command_buffer, pipeline_layout);
+  materials[mesh_type]->use(command_buffer,
+                            pipeline_layout[PipelineType::STANDARD]);
   command_buffer.drawIndexed(index_count, instance_count, first_index, 0,
                              start_instance);
   start_instance += instance_count;
 }
 
-void VulkanIce::record_draw_commands(vk::CommandBuffer command_buffer,
-                                     uint32_t image_index, Scene *scene) {
-
-  vk::CommandBufferBeginInfo begin_info = {};
-
-  try {
-    command_buffer.begin(begin_info);
-  } catch (vk::SystemError err) {
-    throw std::runtime_error("Failed to begin recording command buffer!");
-  }
+void VulkanIce::record_sky_draw_commands(vk::CommandBuffer command_buffer,
+                                         uint32_t image_index, Scene *scene) {
   // clear values unions
   vk::ClearValue clear_color =
       vk::ClearColorValue({std::array<float, 4>{1.0f, 0.5f, 0.25f, 1.0f}});
@@ -572,8 +663,9 @@ void VulkanIce::record_draw_commands(vk::CommandBuffer command_buffer,
   std::vector<vk::ClearValue> clear_values = {{clear_color, clear_depth}};
 
   vk::RenderPassBeginInfo renderpass_info = {
-      .renderPass = renderpass,
-      .framebuffer = swapchain_frames[image_index].framebuffer,
+      .renderPass = renderpass[PipelineType::SKY],
+      .framebuffer =
+          swapchain_frames[image_index].framebuffer[PipelineType::SKY],
       .renderArea{
           .offset{.x = 0, .y = 0},
           .extent = swapchain_extent,
@@ -586,11 +678,52 @@ void VulkanIce::record_draw_commands(vk::CommandBuffer command_buffer,
   command_buffer.beginRenderPass(&renderpass_info,
                                  vk::SubpassContents::eInline);
 
-  command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
+  command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                              pipeline[PipelineType::SKY]);
 
   command_buffer.bindDescriptorSets(
-      vk::PipelineBindPoint::eGraphics, pipeline_layout, 0,
-      swapchain_frames[image_index].descriptor_set, nullptr);
+      vk::PipelineBindPoint::eGraphics, pipeline_layout[PipelineType::SKY], 0,
+      swapchain_frames[image_index].descriptor_sets[PipelineType::SKY],
+      nullptr);
+
+  cube_map->use(command_buffer, pipeline_layout[PipelineType::SKY]);
+  command_buffer.draw(6, 1, 0, 0);
+
+  command_buffer.endRenderPass();
+}
+
+void VulkanIce::record_scene_draw_commands(vk::CommandBuffer command_buffer,
+                                           uint32_t image_index, Scene *scene) {
+  // clear values unions
+  vk::ClearValue clear_color =
+      vk::ClearColorValue({std::array<float, 4>{1.0f, 0.5f, 0.25f, 1.0f}});
+  vk::ClearValue clear_depth = vk::ClearDepthStencilValue({1.0f, 0});
+
+  std::vector<vk::ClearValue> clear_values = {{clear_color, clear_depth}};
+
+  vk::RenderPassBeginInfo renderpass_info = {
+      .renderPass = renderpass[PipelineType::STANDARD],
+      .framebuffer =
+          swapchain_frames[image_index].framebuffer[PipelineType::STANDARD],
+      .renderArea{
+          .offset{.x = 0, .y = 0},
+          .extent = swapchain_extent,
+      },
+
+      .clearValueCount = static_cast<std::uint32_t>(clear_values.size()),
+      .pClearValues = clear_values.data(),
+  };
+
+  command_buffer.beginRenderPass(&renderpass_info,
+                                 vk::SubpassContents::eInline);
+
+  command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                              pipeline[PipelineType::STANDARD]);
+
+  command_buffer.bindDescriptorSets(
+      vk::PipelineBindPoint::eGraphics, pipeline_layout[PipelineType::STANDARD],
+      0, swapchain_frames[image_index].descriptor_sets[PipelineType::STANDARD],
+      nullptr);
 
   prepare_scene(command_buffer);
 
@@ -604,13 +737,6 @@ void VulkanIce::record_draw_commands(vk::CommandBuffer command_buffer,
   }
 
   command_buffer.endRenderPass();
-
-  try {
-    command_buffer.end();
-  } catch (vk::SystemError err) {
-
-    throw std::runtime_error("failed to record command buffer!");
-  }
 }
 
 // Debug Messenger

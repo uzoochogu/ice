@@ -10,11 +10,20 @@ namespace ice {
 
 struct GraphicsPipelineInBundle {
   vk::Device device;
+  std::optional<std::vector<vk::VertexInputAttributeDescription>>
+      attribute_descriptions;
+  std::optional<vk::VertexInputBindingDescription> binding_description;
   std::string vertex_filepath;
   std::string fragment_filepath;
   vk::Extent2D swapchain_extent;
-  vk::Format swapchain_image_format, swapchain_depth_format;
+  std::vector<vk::Format> swapchain_image_format;
+  std::optional<vk::Format> swapchain_depth_format;
   std::vector<vk::DescriptorSetLayout> descriptor_set_layouts;
+  /*  bool should_overwrite; */
+  vk::AttachmentLoadOp load_op{vk::AttachmentLoadOp::eClear};
+  /* vk::AttachmentStoreOp store_op {vk::AttachmentStoreOp::eStore} */;
+  vk::ImageLayout initial_layout{vk::ImageLayout::eUndefined};
+  /* vk::ImageLayout final_layout{vk::ImageLayout::ePresentSrcKHR} */;
 };
 
 struct GraphicsPipelineOutBundle {
@@ -45,51 +54,74 @@ inline vk::PipelineLayout make_pipeline_layout(
 
 inline vk::RenderPass
 make_renderpass(const vk::Device &device,
-                const vk::Format &swapchain_image_format,
-                const vk::Format &swapchain_depth_format) {
+                const std::vector<vk::Format> &swapchain_image_format,
+                const std::optional<vk::Format> &swapchain_depth_format,   vk::AttachmentLoadOp load_op = vk::AttachmentLoadOp::eDontCare,
+  /* vk::AttachmentStoreOp store_op = vk::AttachmentStoreOp::eDontCare, */
+  vk::ImageLayout initial_layout = vk::ImageLayout::eUndefined/* ,
+  vk::ImageLayout final_layout = vk::ImageLayout::ePresentSrcKHR */) {
 #ifndef NDEBUG
   std::cout << "Making Renderpass" << std::endl;
 #endif
 
-  // Color attachments
-  vk::AttachmentDescription color_attachment{
-      .format = swapchain_image_format,
-      .samples = vk::SampleCountFlagBits::e1,
-      .loadOp = vk::AttachmentLoadOp::eClear,
-      .storeOp = vk::AttachmentStoreOp::eStore,
-      .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
-      .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
-      .initialLayout = vk::ImageLayout::eUndefined,
-      .finalLayout = vk::ImageLayout::ePresentSrcKHR};
+  // To collate attachments
+  std::vector<vk::AttachmentDescription> attachments;
 
-  vk::AttachmentReference color_attachment_ref{
-      .attachment = 0, .layout = vk::ImageLayout::eColorAttachmentOptimal};
+  // Color attachments
+  attachments.reserve(swapchain_image_format.size());
+  std::vector<vk::AttachmentReference> color_attachment_refs;
+  color_attachment_refs.reserve(swapchain_image_format.size());
+
+  std::uint32_t attachment_index{0};
+  for (vk::Format color_image_format : swapchain_image_format) {
+    vk::AttachmentDescription color_attachment = {
+        .format = color_image_format,
+        .samples = vk::SampleCountFlagBits::e1,
+        .loadOp = load_op,
+        .storeOp = vk::AttachmentStoreOp::eStore,
+        .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+        .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+        .initialLayout = initial_layout,
+        .finalLayout = vk::ImageLayout::ePresentSrcKHR};
+
+    attachments.emplace_back(color_attachment);
+
+    vk::AttachmentReference color_attachment_ref = {
+        .attachment = attachment_index,
+        .layout = vk::ImageLayout::eColorAttachmentOptimal};
+    color_attachment_refs.emplace_back(color_attachment_ref);
+
+    ++attachment_index;
+  }
 
   // Depth Attachment
-  vk::AttachmentDescription depth_attachment{
-      .format = swapchain_depth_format,
-      .samples = vk::SampleCountFlagBits::e1,
-      .loadOp = vk::AttachmentLoadOp::eClear,
-      .storeOp = vk::AttachmentStoreOp::eDontCare,
-      .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
-      .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
-      .initialLayout = vk::ImageLayout::eUndefined,
-      .finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal};
+  vk::AttachmentReference depth_attachment_ref{};
+  bool depth_present = swapchain_depth_format.has_value();
+  if (depth_present) {
+    vk ::AttachmentDescription depth_attachment{
+        .format = swapchain_depth_format.value(),
+        .samples = vk::SampleCountFlagBits::e1,
+        .loadOp = vk::AttachmentLoadOp::eClear,
+        .storeOp = vk::AttachmentStoreOp::eDontCare,
+        .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+        .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+        .initialLayout = vk::ImageLayout::eUndefined,
+        .finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal};
 
-  vk::AttachmentReference depth_attachment_ref{
-      .attachment = 1,
-      .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal};
+    attachments.emplace_back(depth_attachment);
 
-  // collate attachments
-  std::vector<vk::AttachmentDescription> attachments = {color_attachment,
-                                                        depth_attachment};
+    depth_attachment_ref = {
+        .attachment = attachment_index,
+        .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal};
+  }
 
   // pass attachment refs
   vk::SubpassDescription subpass = {
       .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
-      .colorAttachmentCount = 1,
-      .pColorAttachments = &color_attachment_ref,
-      .pDepthStencilAttachment = &depth_attachment_ref};
+      .colorAttachmentCount =
+          static_cast<std::uint32_t>(color_attachment_refs.size()),
+      .pColorAttachments = color_attachment_refs.data(),
+      .pDepthStencilAttachment =
+          depth_present ? &depth_attachment_ref : nullptr};
 
   vk::RenderPassCreateInfo renderpass_info{
       .attachmentCount = static_cast<std::uint32_t>(attachments.size()),
@@ -114,18 +146,27 @@ make_graphics_pipeline(const GraphicsPipelineInBundle &specification) {
 
   // Vertex input
   // Get vertex data binding descriptions
-  vk::VertexInputBindingDescription binding_description =
-      Vertex::get_binding_description();
-  std::vector<vk::VertexInputAttributeDescription> attribute_descriptions =
-      Vertex::get_attribute_descriptions();
+  bool vertex_attributes_present =
+      specification.attribute_descriptions.has_value();
+  bool vertex_bindings_present = specification.binding_description.has_value();
 
-  vk::PipelineVertexInputStateCreateInfo vertex_input_info = {
-      .flags = vk::PipelineVertexInputStateCreateFlags(),
-      .vertexBindingDescriptionCount = 1,
-      .pVertexBindingDescriptions = &binding_description,
-      .vertexAttributeDescriptionCount =
-          static_cast<std::uint32_t>(attribute_descriptions.size()),
-      .pVertexAttributeDescriptions = attribute_descriptions.data()};
+  vk::PipelineVertexInputStateCreateInfo vertex_input_info{};
+  if (vertex_attributes_present && vertex_bindings_present) {
+    /*   vk::VertexInputBindingDescription binding_description =
+          Vertex::get_binding_description();
+      std::vector<vk::VertexInputAttributeDescription> attribute_descriptions =
+          Vertex::get_attribute_descriptions(); */
+
+    vertex_input_info = {
+        .flags = vk::PipelineVertexInputStateCreateFlags(),
+        .vertexBindingDescriptionCount = 1,
+        .pVertexBindingDescriptions =
+            &specification.binding_description.value(),
+        .vertexAttributeDescriptionCount = static_cast<std::uint32_t>(
+            specification.attribute_descriptions.value().size()),
+        .pVertexAttributeDescriptions =
+            specification.attribute_descriptions.value().data()};
+  }
   pipeline_info.pVertexInputState = &vertex_input_info;
 
   // Input Assembly
@@ -156,7 +197,8 @@ make_graphics_pipeline(const GraphicsPipelineInBundle &specification) {
         .pDynamicStates = dynamic_states.data()};
 
     // Specify their count at pipeline  creation time
-    // The actual viewport and scissor rectangle will be later set up at drawing
+    // The actual viewport and scissor rectangle will be later set up at
+    drawing
     // time
     vk::PipelineViewportStateCreateInfo viewport_state{.viewportCount = 1,
                                                        .scissorCount = 1};
@@ -260,7 +302,9 @@ make_graphics_pipeline(const GraphicsPipelineInBundle &specification) {
   //  Renderpass
   vk::RenderPass renderpass = make_renderpass(
       specification.device, specification.swapchain_image_format,
-      specification.swapchain_depth_format);
+      specification.swapchain_depth_format, specification.load_op,
+      /* specification.store_op, */ specification.initial_layout/* ,
+      specification.final_layout */);
   pipeline_info.renderPass = renderpass;
   pipeline_info.subpass = 0;
 

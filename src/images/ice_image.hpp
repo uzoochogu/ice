@@ -6,6 +6,7 @@
 
 namespace ice_image {
 
+// Creation struct for textures and Maps
 struct TextureCreationInput {
   vk::PhysicalDevice physical_device;
   vk::Device logical_device;
@@ -13,7 +14,7 @@ struct TextureCreationInput {
   vk::Queue queue;
   vk::DescriptorSetLayout layout;
   vk::DescriptorPool descriptor_pool;
-  const char *filename;
+  std::vector<const char *> filenames;
 };
 
 // VkImage creation struct
@@ -25,6 +26,8 @@ struct ImageCreationInput {
   vk::ImageUsageFlags usage;
   vk::MemoryPropertyFlags memory_properties;
   vk::Format format;
+  std::uint32_t array_count{1};
+  vk::ImageCreateFlags create_flags;
 };
 
 // input needed for image layout transitions jobs
@@ -33,6 +36,7 @@ struct ImageLayoutTransitionJob {
   vk::Queue queue;
   vk::Image image;
   vk::ImageLayout old_layout, new_layout;
+  std::uint32_t array_count{1};
 };
 
 // input necessary for copying a buffer to an image
@@ -42,63 +46,7 @@ struct BufferImageCopyJob {
   vk::Buffer src_buffer;
   vk::Image dst_image;
   int width, height;
-};
-
-class Texture {
-
-public:
-  Texture(const TextureCreationInput &input);
-
-  void use(vk::CommandBuffer command_buffer,
-           vk::PipelineLayout pipeline_layout);
-
-  ~Texture();
-
-private:
-  int width, height, channels;
-  vk::Device logical_device;
-  vk::PhysicalDevice physical_device;
-  const char *filename;
-  stbi_uc *pixels;
-
-  // Resources
-  vk::Image image;
-  vk::DeviceMemory image_memory;
-  vk::ImageView image_view;
-  vk::Sampler sampler;
-
-  // Resource Descriptors
-  vk::DescriptorSetLayout layout;
-  vk::DescriptorSet descriptor_set;
-  vk::DescriptorPool descriptor_pool;
-
-  vk::CommandBuffer command_buffer;
-  vk::Queue queue;
-
-  // Load the raw image data from the internally set filepath.
-  void load();
-
-  /**
-   * Send loaded data to the image. The image must be loaded before calling
-   * this function.
-   */
-  void populate();
-
-  /**
-   * Create a view of the texture. The image must be populated before
-   * calling this function.
-   */
-  void make_view();
-
-  // Configure and create a sampler for the texture.
-  void make_sampler();
-
-  /**
-   * Allocate and write the descriptor set. Currently, this is only being
-   * done once. This must be called after the image view and sampler have been
-   * made.
-   */
-  void make_descriptor_set();
+  std::uint32_t array_count{1};
 };
 
 // Make a Vulkan Image
@@ -127,7 +75,7 @@ void copy_buffer_to_image(const BufferImageCopyJob &copy_job);
 
 // Create a view of a vulkan image.
 vk::ImageView make_image_view(vk::Device logical_device, vk::Image image,
-                              vk::Format format, vk::ImageAspectFlags aspect);
+                              vk::Format format, vk::ImageAspectFlags aspect, vk::ImageViewType view_type = vk::ImageViewType::e2D, std::uint32_t array_count=1);
 
 vk::Format find_supported_format(vk::PhysicalDevice physical_device,
                                  const std::vector<vk::Format> &candidates,
