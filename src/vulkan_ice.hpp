@@ -10,6 +10,8 @@
 #include "images/ice_cube_map.hpp"
 #include "images/ice_texture.hpp"
 #include "mesh_collator.hpp"
+#include "multithreading/ice_jobs.hpp"
+#include "multithreading/ice_worker_threads.hpp"
 #include "pipeline.hpp"
 #include "swapchain.hpp"
 #include "synchronization.hpp"
@@ -92,9 +94,9 @@ private:
   void setup_frame_resources();
 
   // asset setup
+  void make_worker_threads();
   void make_assets();
-  void render_mesh(vk::CommandBuffer command_buffer, MeshTypes mesh_type,
-                   uint32_t &start_instance, uint32_t instance_count);
+  void end_worker_threads();
 
   // frame and scene prep
   void prepare_frame(std::uint32_t image_index, Scene *scene);
@@ -103,6 +105,8 @@ private:
                                 uint32_t image_index, Scene *scene);
   void record_scene_draw_commands(vk::CommandBuffer command_buffer,
                                   uint32_t image_index, Scene *scene);
+  void render_mesh(vk::CommandBuffer command_buffer, MeshTypes mesh_type,
+                   uint32_t &start_instance, uint32_t instance_count);
 
   // cleanup
   void destroy_swapchain_bundle(bool include_swapchain = true);
@@ -125,6 +129,11 @@ private:
   MeshCollator *meshes;
   std::unordered_map<MeshTypes, ice_image::Texture *> materials;
   ice_image::CubeMap *cube_map;
+
+  // Job System
+  bool done = false;
+  ice_threading::WorkQueue work_queue;
+  std::vector<std::thread> workers;
 
   // descriptor-related variables
   std::unordered_map<PipelineType, vk::DescriptorSetLayout> frame_set_layout;

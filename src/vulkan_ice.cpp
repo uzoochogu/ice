@@ -1,5 +1,8 @@
 #include "vulkan_ice.hpp"
+#include "commands.hpp"
 #include "config.hpp"
+#include "game_objects.hpp"
+#include "images/ice_texture.hpp"
 #include "mesh.hpp"
 #include "ubo.hpp"
 
@@ -30,7 +33,9 @@ VulkanIce::VulkanIce(IceWindow &window) : window{window} {
   // Make synchronization objects
   setup_frame_resources();
 
+  make_worker_threads();
   make_assets();
+  end_worker_threads();
 }
 
 VulkanIce::~VulkanIce() {
@@ -66,8 +71,10 @@ VulkanIce::~VulkanIce() {
 
   device.destroy();
 
+#ifndef NDEBUG
   instance.destroyDebugUtilsMessengerEXT(debug_messenger, nullptr, dldi);
   DestroyDebugUtilsMessengerEXT(instance, debug_messenger_c_api, nullptr);
+#endif
   instance.destroySurfaceKHR(surface);
   instance.destroy();
 }
@@ -135,7 +142,10 @@ void VulkanIce::make_instance() {
 
   // init Instance Dynamic loader after instance is created
   dldi = vk::DispatchLoaderDynamic(instance, vkGetInstanceProcAddr);
+
+#ifndef NDEBUG
   make_debug_messenger();
+#endif
 }
 
 // Physical Device
@@ -390,11 +400,27 @@ void VulkanIce::recreate_swapchain() {
   make_frame_command_buffers(command_buffer_req);
 }
 
+void VulkanIce::make_worker_threads() {
+  done = false;
+  size_t thread_count = std::thread::hardware_concurrency() - 1;
+
+  workers.reserve(thread_count);
+  CommandBufferReq command_buffer_input = {device, command_pool,
+                                           swapchain_frames};
+  for (size_t i = 0; i < thread_count; ++i) {
+    vk::CommandBuffer command_buffer =
+        make_command_buffer(command_buffer_input);
+    workers.push_back(std::thread(ice_threading::WorkerThread(
+        work_queue, done, command_buffer, graphics_queue)));
+  }
+}
+
 void VulkanIce::make_assets() {
 
   // Meshes
   meshes = new MeshCollator();
-  // <mesh type , filenames, pre_transforms>
+
+  // <mesh type , filenames, pre_transforms> prep
   std::vector<std::tuple<MeshTypes, std::vector<const char *>, glm::mat4>>
       model_inputs = {
           {MeshTypes::GROUND,
@@ -410,30 +436,25 @@ void VulkanIce::make_assets() {
            {"resources/models/skull.obj", "resources/models/skull.mtl"},
            glm::mat4(1.0f)}};
 
-  // std::pair<MeshTypes, std::vector<const char*>, glm::mat4> pair
-  for (const auto &[mesh_types, filenames, pre_transform] : model_inputs) {
-    ObjMesh model(filenames[0], filenames[1], pre_transform);
-    meshes->consume(mesh_types, model.vertices, model.indices);
-  }
+  /*   //  pair
+    for (const auto &[mesh_types, filenames, pre_transform] : model_inputs) {
+      ObjMesh model(filenames[0], filenames[1], pre_transform);
+      meshes->consume(mesh_types, model.vertices, model.indices);
+    } */
 
-  VertexBufferFinalizationInput finalization_info{
-      .logical_device = device,
-      .physical_device = physical_device,
-      .command_buffer = main_command_buffer,
-      .queue = graphics_queue};
+  // stores models to be loaded
+  std::unordered_map<MeshTypes, ObjMesh> models;
 
-  meshes->finalize(finalization_info);
-
-  // Materials (Textures)
-  std::unordered_map<MeshTypes, const char *> filenames = {
+  // Materials (Textures) prep
+  std::unordered_map<MeshTypes, const char *> texture_filenames = {
       {MeshTypes::GROUND, "resources/textures/ground.jpg"},
       {MeshTypes::GIRL, "resources/textures/none.png"},
       {MeshTypes::SKULL, "resources/textures/skull.png"}};
 
   // mesh descriptor pool to allocate sets
-  mesh_descriptor_pool =
-      make_descriptor_pool(device, static_cast<uint32_t>(filenames.size()) + 1,
-                           mesh_set_layout_bindings); // extra set for cube map
+  mesh_descriptor_pool = make_descriptor_pool(
+      device, static_cast<uint32_t>(texture_filenames.size()) + 1,
+      mesh_set_layout_bindings); // extra set for cube map
 
   ice_image::TextureCreationInput texture_info{
       .physical_device = physical_device,
@@ -443,10 +464,64 @@ void VulkanIce::make_assets() {
       .layout = mesh_set_layout[PipelineType::STANDARD],
       .descriptor_pool = mesh_descriptor_pool};
 
-  for (const auto &[object, filename] : filenames) {
-    texture_info.filenames = {filename};
-    materials[object] = new ice_image::Texture(texture_info);
+  // Submit loading work
+  work_queue.lock.lock();
+  // std::tuple<MeshTypes, std::vector<const char*>, glm::mat4>
+  for (const auto &[mesh_type, obj_mtl_filename, pre_transform] :
+       model_inputs) {
+    texture_info.filenames = {texture_filenames[mesh_type]};
+
+    // Default construct without loading
+    materials[mesh_type] = new ice_image::Texture();
+    models[mesh_type] = ObjMesh();
+
+    // Add loading jobs
+    work_queue.add(
+        new ice_threading::MakeTexture(materials[mesh_type], texture_info));
+    // MakeModel(ice::ObjMesh &mesh, const char *obj_filepath, const char
+    // *mtl_filepath, glm::mat4 pre_transform)
+    work_queue.add(
+        new ice_threading::MakeModel(models[mesh_type], obj_mtl_filename[0],
+                                     obj_mtl_filename[1], pre_transform));
   }
+
+  work_queue.lock.unlock();
+
+  // loading work to be done by background thread, wait till completion
+#ifndef NDEBUG
+  std::cout << "Waiting for work to finish." << std::endl;
+#endif
+
+  while (true) {
+    if (!work_queue.lock.try_lock()) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(200));
+      continue;
+    }
+
+    if (work_queue.done()) {
+#ifndef NDEBUG
+      std::cout << "Work finished" << std::endl;
+#endif
+      work_queue.clear();
+      work_queue.lock.unlock();
+      break;
+    }
+    work_queue.lock.unlock();
+  }
+
+  // Consume loaded meshes
+  // std::pair<MeshTypes, ObjMesh>
+  for (const auto &[mesh_type, model] : models) {
+    meshes->consume(mesh_type, model.vertices, model.indices);
+  }
+
+  VertexBufferFinalizationInput finalization_info{
+      .logical_device = device,
+      .physical_device = physical_device,
+      .command_buffer = main_command_buffer,
+      .queue = graphics_queue};
+
+  meshes->finalize(finalization_info);
 
   // Sky Texture
   texture_info.layout = mesh_set_layout[PipelineType::SKY];
@@ -463,6 +538,17 @@ void VulkanIce::make_assets() {
 
 #ifndef NDEBUG
   std::cout << "Finished making assets" << std::endl;
+#endif
+}
+
+void VulkanIce::end_worker_threads() {
+  done = true;
+
+  for (size_t i = 0; i < workers.size(); ++i) {
+    workers[i].join();
+  }
+#ifndef NDEBUG
+  std::cout << "Threads ended successfully." << std::endl;
 #endif
 }
 
@@ -858,8 +944,10 @@ bool VulkanIce::is_device_suitable(const vk::PhysicalDevice &device) {
   // swapChainAdequate &&
   // supportedFeatures.samplerAnisotropy
 
+#ifndef NDEBUG
   std::cout << std::format("The value of indices: {}\n",
                            indices.graphics_family.has_value());
+#endif
   // return indices.graphics_family.has_value();
   return indices.is_complete();
 }

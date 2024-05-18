@@ -106,8 +106,17 @@ public:
   glm::vec3 brush_color;
   glm::mat4 pre_transform;
 
+  // Methods
+
+  // Defers loading to when load() is called
+  ObjMesh() = default;
+
+  // construct and load
   ObjMesh(const char *obj_filepath, const char *mtl_filepath,
           glm::mat4 pre_transform);
+
+  void load(const char *obj_filepath, const char *mtl_filepath,
+            glm::mat4 pre_transform);
 
   void read_vertex_data(const std::vector<std::string> &words);
 

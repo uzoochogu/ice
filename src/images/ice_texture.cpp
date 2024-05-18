@@ -4,7 +4,9 @@
 
 namespace ice_image {
 
-Texture::Texture(const TextureCreationInput &input) {
+Texture::Texture(const TextureCreationInput &input) { load(input); }
+
+void Texture::load(const TextureCreationInput &input) {
 
   logical_device = input.logical_device;
   physical_device = input.physical_device;
@@ -119,9 +121,9 @@ void Texture::populate() {
 }
 
 void Texture::make_view() {
-  image_view =
-      make_image_view(logical_device, image, vk::Format::eR8G8B8A8Unorm,
-                      vk::ImageAspectFlagBits::eColor, vk::ImageViewType::e2D, 1);
+  image_view = make_image_view(
+      logical_device, image, vk::Format::eR8G8B8A8Unorm,
+      vk::ImageAspectFlagBits::eColor, vk::ImageViewType::e2D, 1);
 }
 
 void Texture::make_sampler() {

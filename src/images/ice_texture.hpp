@@ -2,19 +2,24 @@
 #define ICE_TEXTURE_HPP
 
 #include "../config.hpp"
-#include <stb_image.h>
 #include "ice_image.hpp"
+#include <stb_image.h>
 
 namespace ice_image {
 
 class Texture {
 
 public:
+  // Defer loading to an explicit load call
+  Texture() = default;
+
+  // Construct and load
   Texture(const TextureCreationInput &input);
 
   void use(vk::CommandBuffer command_buffer,
            vk::PipelineLayout pipeline_layout);
 
+  void load(const TextureCreationInput &input); // public load
   ~Texture();
 
 private:

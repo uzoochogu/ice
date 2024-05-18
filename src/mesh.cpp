@@ -4,6 +4,11 @@ namespace ice {
 
 ObjMesh::ObjMesh(const char *obj_filepath, const char *mtl_filepath,
                  glm::mat4 pre_transform) {
+  load(obj_filepath, mtl_filepath, pre_transform);
+}
+
+void ObjMesh::load(const char *obj_filepath, const char *mtl_filepath,
+                   glm::mat4 pre_transform) {
 
   this->pre_transform = pre_transform;
 
