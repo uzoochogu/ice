@@ -74,8 +74,11 @@ void transition_image_layout(ImageLayoutTransitionJob transition_job);
 void copy_buffer_to_image(const BufferImageCopyJob &copy_job);
 
 // Create a view of a vulkan image.
-vk::ImageView make_image_view(vk::Device logical_device, vk::Image image,
-                              vk::Format format, vk::ImageAspectFlags aspect, vk::ImageViewType view_type = vk::ImageViewType::e2D, std::uint32_t array_count=1);
+vk::ImageView
+make_image_view(vk::Device logical_device, vk::Image image, vk::Format format,
+                vk::ImageAspectFlags aspect,
+                vk::ImageViewType view_type = vk::ImageViewType::e2D,
+                std::uint32_t array_count = 1);
 
 vk::Format find_supported_format(vk::PhysicalDevice physical_device,
                                  const std::vector<vk::Format> &candidates,

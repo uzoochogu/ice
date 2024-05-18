@@ -34,7 +34,7 @@ CubeMap::CubeMap(const TextureCreationInput &input) {
 #endif
   }
 
- load();
+  load();
 
   // Error handling for Error in load
   for (int i = 0; i < FACES_IN_CUBE; ++i) {

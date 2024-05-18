@@ -5,7 +5,6 @@
 #include "../descriptors.hpp"
 #include "ice_image.hpp"
 
-
 namespace ice_image {
 vk::Image make_image(const ImageCreationInput &input) {
   vk::ImageCreateInfo image_info{
@@ -36,7 +35,7 @@ vk::Image make_image(const ImageCreationInput &input) {
 }
 
 vk::DeviceMemory make_image_memory(const ImageCreationInput &input,
-                                          vk::Image image) {
+                                   vk::Image image) {
   vk::MemoryRequirements requirements =
       input.logical_device.getImageMemoryRequirements(image);
 
@@ -140,11 +139,10 @@ void copy_buffer_to_image(const BufferImageCopyJob &copy_job) {
   ice::end_job(copy_job.command_buffer, copy_job.queue);
 }
 
-vk::ImageView
-make_image_view(vk::Device logical_device, vk::Image image, vk::Format format,
-                vk::ImageAspectFlags aspect,
-                vk::ImageViewType view_type,
-                std::uint32_t array_count) {
+vk::ImageView make_image_view(vk::Device logical_device, vk::Image image,
+                              vk::Format format, vk::ImageAspectFlags aspect,
+                              vk::ImageViewType view_type,
+                              std::uint32_t array_count) {
   vk::ImageViewCreateInfo create_info = {
       .image = image,
       .viewType = view_type,
@@ -168,10 +166,10 @@ make_image_view(vk::Device logical_device, vk::Image image, vk::Format format,
 
 // @brief Finds supported format given some candidates and features to look for.
 // @exception throws a runtime error if no format is found
-vk::Format
-find_supported_format(vk::PhysicalDevice physical_device,
-                      const std::vector<vk::Format> &candidates,
-                      vk::ImageTiling tiling, vk::FormatFeatureFlags features) {
+vk::Format find_supported_format(vk::PhysicalDevice physical_device,
+                                 const std::vector<vk::Format> &candidates,
+                                 vk::ImageTiling tiling,
+                                 vk::FormatFeatureFlags features) {
   for (vk::Format format : candidates) {
 
     vk::FormatProperties properties =

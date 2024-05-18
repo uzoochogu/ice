@@ -38,23 +38,26 @@ inline void make_framebuffers(const FramebufferInput &input_bundle,
         input_bundle.device.createFramebuffer(framebuffer_info);
 
     if (out_frames[i].framebuffer[PipelineType::SKY] == nullptr) {
-      std::cout << std::format("Failed to create Sky framebuffer for frame {}", i)
+      std::cout << std::format("Failed to create Sky framebuffer for frame {}",
+                               i)
                 << std::endl;
     }
 
-   attachments.push_back(out_frames[i].depth_buffer_view);
-   framebuffer_info.renderPass = input_bundle.renderpass.at(PipelineType::STANDARD);
-   framebuffer_info.attachmentCount = static_cast<uint32_t>(attachments.size());
-   framebuffer_info.pAttachments = attachments.data();
+    attachments.push_back(out_frames[i].depth_buffer_view);
+    framebuffer_info.renderPass =
+        input_bundle.renderpass.at(PipelineType::STANDARD);
+    framebuffer_info.attachmentCount =
+        static_cast<uint32_t>(attachments.size());
+    framebuffer_info.pAttachments = attachments.data();
 
     out_frames[i].framebuffer[PipelineType::STANDARD] =
         input_bundle.device.createFramebuffer(framebuffer_info);
 
     if (out_frames[i].framebuffer[PipelineType::STANDARD] == nullptr) {
-      std::cout << std::format("Failed to create standard framebuffer for frame {}", i)
+      std::cout << std::format(
+                       "Failed to create standard framebuffer for frame {}", i)
                 << std::endl;
     }
-
   }
 }
 

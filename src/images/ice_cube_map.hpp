@@ -2,10 +2,11 @@
 #define ICE_CUBE_MAP_HPP
 
 #include "../config.hpp"
-#include <bitset>
-#include <stb_image.h>
 #include "ice_image.hpp"
 #include "images/ice_image.hpp"
+#include <bitset>
+#include <stb_image.h>
+
 
 namespace ice_image {
 
@@ -26,7 +27,7 @@ private:
   vk::Device logical_device;
   vk::PhysicalDevice physical_device;
   std::vector<const char *> filenames;
-  stbi_uc* pixels[FACES_IN_CUBE];
+  stbi_uc *pixels[FACES_IN_CUBE];
 
   // Resources
   vk::Image image;

@@ -50,12 +50,13 @@ public:
   void *model_buffer_write_location;
 
   // Resource Descriptors
-  vk::DescriptorBufferInfo camera_vector_descriptor_info, camera_matrix_descriptor_info;
+  vk::DescriptorBufferInfo camera_vector_descriptor_info,
+      camera_matrix_descriptor_info;
   vk::DescriptorBufferInfo ssbo_descriptor_info;
   std::unordered_map<PipelineType, vk::DescriptorSet> descriptor_sets;
 
-	//Write Operations
-	std::vector<vk::WriteDescriptorSet> write_ops;
+  // Write Operations
+  std::vector<vk::WriteDescriptorSet> write_ops;
 
   void make_descriptor_resources();
 

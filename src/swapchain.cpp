@@ -93,8 +93,7 @@ void SwapChainFrame::record_write_operations() {
   vk::WriteDescriptorSet camera_matrix_write_op = {
       .dstSet = descriptor_sets[PipelineType::STANDARD],
       .dstBinding = 0,
-      .dstArrayElement =
-          0,
+      .dstArrayElement = 0,
       .descriptorCount = 1,
       .descriptorType = vk::DescriptorType::eUniformBuffer,
       .pBufferInfo = &camera_matrix_descriptor_info};
@@ -102,8 +101,7 @@ void SwapChainFrame::record_write_operations() {
   vk::WriteDescriptorSet ssbo_write_op = {
       .dstSet = descriptor_sets[PipelineType::STANDARD],
       .dstBinding = 1,
-      .dstArrayElement =
-          0,
+      .dstArrayElement = 0,
       .descriptorCount = 1,
       .descriptorType = vk::DescriptorType::eStorageBuffer,
       .pBufferInfo = &ssbo_descriptor_info};
