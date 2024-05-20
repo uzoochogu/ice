@@ -2,9 +2,6 @@
 #include "../commands.hpp"
 #include "../data_buffers.hpp"
 #include "../descriptors.hpp"
-#include <stdexcept>
-#include <stdint.h>
-#include <vulkan/vulkan_enums.hpp>
 
 namespace ice_image {
 
