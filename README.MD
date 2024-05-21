@@ -1,10 +1,14 @@
-# Ice
-A vulkan Renderer. Game Engine WIP. 3D model viewport WIP.
+# ice
+A Vulkan Renderer. Game Engine (WIP). 3D model viewport (WIP).
 
-## Dependency managment
+## Requirements
+* C++ compiler supporting at least C++20 standard.
+* Cmake 3.8+
+
+## Dependency management
 These are the project dependencies
-1. `imgui` with glfw, opengl and vulkan bindings
-2. `glfw` - windowing (You should be able to plugin any windowing lib)
+1. `imgui` with glfw and vulkan bindings. It is currently not used and is not included in the project but will provide immediate mode GUI capabilities when added.
+2. `glfw` - windowing (You should be able to plug in any windowing lib like SDL) - You just need to reimplement [`IceWindow`](./src/windowing.hpp) class using the library.
 3. `glm` - linear algebra, good compatibility with GLSL.
 4. `stb` - loading images
 5. `tinyobjloader` - loading obj models
@@ -32,11 +36,9 @@ C:/dev/vcpkg/vcpkg install --triplet x64-windows
 ```
 Global install:
 ```bash
-path_to_vcpkg install imgui[glfw-binding,opengl3-binding,vulkan-binding]:triplet_name
-path_to_vcpkg install glad:triplet_name
+path_to_vcpkg install imgui[glfw-binding,vulkan-binding]:triplet_name
 path_to_vcpkg install glfw3:triplet_name
 path_to_vcpkg install glm:triplet_name
-path_to_vcpkg install tinyobjloader[double]:triplet_name
 path_to_vcpkg install stb:triplet_name
 path_to_vcpkg integrate install
 ```
@@ -57,7 +59,7 @@ cd ./resources/shaders
 
 ## Building
 Do the following steps
-1. [`Install dependencies`](#dependency-managment)
+1. [`Install dependencies`](#dependency-management)
 2. [`Compile shaders`](#shaders-compilation)
 3. Generate and/or Building with CMake
 
@@ -80,10 +82,10 @@ This will build the project.
 
 ### Using Visual Studio
 On Windows, if you prefer working in Visual Studio, after generation is done, you can open the generated `sln` file and build any target you want.
-Just make sure it is the selected as a Startup project. The working directory and post build commands have been automatically configured.
+The Startup project, working directory and post build commands have been automatically configured.
 
 ## Useful resources
 * [`vulkan-tutorial.com`](https://vulkan-tutorial.com/)
 * [`My Imgui-vulkan personal reference`](https://github.com/uzoochogu/imgui-vulkan-app)
-* [`amengede's GetIntoGameDev Vulkan 2022 series`](https://github.com/amengede/getIntoGameDev/tree/main/vulkan%202022) - Created a new series ->[Link to new series](https://github.com/amengede/getIntoGameDev/tree/main/vulkan) 
+* [`amengede's GetIntoGameDev Vulkan 2022 series`](https://github.com/amengede/getIntoGameDev/tree/main/vulkan%202022) - Created a new series ->[`Link to new series`](https://github.com/amengede/getIntoGameDev/tree/main/vulkan) 
 * [`Brendan's Little Vulkan Engine`](https://github.com/blurrypiano/littleVulkanEngine/tree/main)
