@@ -19,7 +19,7 @@ IceWindow::~IceWindow() {
   glfwTerminate();
 }
 
-// Return the required list of extension based on whether validation layers
+// Returns the required list of extension based on whether validation layers
 // are enabled or not,
 std::vector<const char *> IceWindow::get_required_extensions() const {
   std::uint32_t glfwExtensionCount = 0;

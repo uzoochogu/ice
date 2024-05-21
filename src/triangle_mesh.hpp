@@ -6,9 +6,7 @@
 #include "mesh.hpp"
 
 namespace ice {
-/**
-        Holds a vertex buffer for a triangle mesh.
-*/
+// Holds a vertex buffer for a triangle mesh.
 class TriangleMesh {
 public:
   TriangleMesh(const vk::Device logical_device,

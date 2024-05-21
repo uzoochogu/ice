@@ -10,21 +10,13 @@ namespace ice {
 
 // Vertex data
 // To be used in the vertex shader
-// GLM provides C++ types that exactly match vector types used
-// in shader language
 struct Vertex {
   glm::vec3 pos;
   glm::vec3 color;
   glm::vec2 tex_coord;
   glm::vec3 normal;
 
-  // A vertex binding describes at which rate to load data from memory
-  // throughout the vertices. It specifies the number of bytes between data
-  // entries and whether to move to the next data entry after each vertex or
-  // after each instance.
   static vk::VertexInputBindingDescription get_binding_description() {
-    // All of our per-vertex data is packed together in one array, so we're
-    // only going to have one binding.
     vk::VertexInputBindingDescription binding_description{
         .binding = 0,
         .stride = sizeof(Vertex),
@@ -33,25 +25,17 @@ struct Vertex {
     return binding_description;
   }
 
-  // An attribute description struct describes how to extract a vertex attribute
-  // from a chunk of vertex data originating from a binding description. We have
-  // three attributes pos, color and texCoord.
-
   static std::vector<vk::VertexInputAttributeDescription>
   get_attribute_descriptions() {
     std::vector<vk::VertexInputAttributeDescription> attribute_descriptions(4);
 
-    // Tells Vulkan from which binding the per-vertex data comes.
     attribute_descriptions[0].binding = 0;
 
-    // This references the location directive of the input in the vertex shader.
-    // e.g layout(location = 0) in vec3 inPosition;
     attribute_descriptions[0].location = 0;
 
-    // a vec3.
-    attribute_descriptions[0].format = vk::Format::eR32G32B32Sfloat;
+    
+    attribute_descriptions[0].format = vk::Format::eR32G32B32Sfloat; // vec3.
 
-    // offset of x bytes from the beginning of this struct.
     attribute_descriptions[0].offset = offsetof(Vertex, pos);
 
     // color attribute
@@ -64,7 +48,7 @@ struct Vertex {
     attribute_descriptions[2].binding = 0;
     attribute_descriptions[2].location = 2;
     attribute_descriptions[2].format =
-        vk::Format::eR32G32Sfloat; // vec2 for texture coordinates
+        vk::Format::eR32G32Sfloat; // vec2
     attribute_descriptions[2].offset = offsetof(Vertex, tex_coord);
 
     // normal attribute

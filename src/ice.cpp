@@ -2,7 +2,6 @@
 #include <sstream>
 
 namespace ice {
-/* Ice::Ice() { vulkan_backend.make_instance(); } */
 
 Ice::~Ice() {}
 

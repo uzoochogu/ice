@@ -42,7 +42,9 @@ VulkanIce::~VulkanIce() {
 
   device.waitIdle();
 
+#ifndef NDEBUG
   std::cout << "Vulkan Destroyed" << std::endl;
+#endif
 
   device.destroyCommandPool(command_pool);
 

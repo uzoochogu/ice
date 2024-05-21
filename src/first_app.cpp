@@ -1,7 +1,4 @@
 #include "ice.hpp"
-
-// std
-/* #include <iostream> */
 #include <stdexcept>
 
 int main() {
