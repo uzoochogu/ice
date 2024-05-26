@@ -1,8 +1,5 @@
 #include "vulkan_ice.hpp"
-#include "commands.hpp"
-#include "config.hpp"
 #include "game_objects.hpp"
-#include "images/ice_texture.hpp"
 #include "mesh.hpp"
 #include "ubo.hpp"
 

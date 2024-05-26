@@ -3,9 +3,6 @@
 
 #include "../config.hpp"
 #include "ice_image.hpp"
-#include "images/ice_image.hpp"
-#include <stb_image.h>
-
 
 namespace ice_image {
 

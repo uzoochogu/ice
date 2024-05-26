@@ -1,5 +1,5 @@
+#define STB_IMAGE_IMPLEMENTATION
 #include "ice_cube_map.hpp"
-#include "../commands.hpp"
 #include "../data_buffers.hpp"
 #include "../descriptors.hpp"
 

@@ -33,7 +33,6 @@ struct Vertex {
 
     attribute_descriptions[0].location = 0;
 
-    
     attribute_descriptions[0].format = vk::Format::eR32G32B32Sfloat; // vec3.
 
     attribute_descriptions[0].offset = offsetof(Vertex, pos);
@@ -47,8 +46,7 @@ struct Vertex {
     // texture attributes
     attribute_descriptions[2].binding = 0;
     attribute_descriptions[2].location = 2;
-    attribute_descriptions[2].format =
-        vk::Format::eR32G32Sfloat; // vec2
+    attribute_descriptions[2].format = vk::Format::eR32G32Sfloat; // vec2
     attribute_descriptions[2].offset = offsetof(Vertex, tex_coord);
 
     // normal attribute
