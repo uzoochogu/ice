@@ -3,7 +3,6 @@
 
 #include "../config.hpp"
 #include "ice_image.hpp"
-#include <stb_image.h>
 
 namespace ice_image {
 
@@ -24,6 +23,7 @@ public:
 
 private:
   int width, height, channels;
+  std::uint32_t mip_levels{1};
   vk::Device logical_device;
   vk::PhysicalDevice physical_device;
   const char *filename;

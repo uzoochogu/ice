@@ -28,6 +28,7 @@ struct ImageCreationInput {
   vk::Format format;
   std::uint32_t array_count{1};
   vk::ImageCreateFlags create_flags;
+  std::uint32_t mip_levels{1};
 };
 
 // input needed for image layout transitions jobs
@@ -37,6 +38,7 @@ struct ImageLayoutTransitionJob {
   vk::Image image;
   vk::ImageLayout old_layout, new_layout;
   std::uint32_t array_count{1};
+  std::uint32_t mip_levels{1};
 };
 
 // input necessary for copying a buffer to an image
@@ -78,12 +80,27 @@ vk::ImageView
 make_image_view(vk::Device logical_device, vk::Image image, vk::Format format,
                 vk::ImageAspectFlags aspect,
                 vk::ImageViewType view_type = vk::ImageViewType::e2D,
-                std::uint32_t array_count = 1);
+                std::uint32_t array_count = 1, std::uint32_t mip_levels = 1);
 
 vk::Format find_supported_format(vk::PhysicalDevice physical_device,
                                  const std::vector<vk::Format> &candidates,
                                  vk::ImageTiling tiling,
                                  vk::FormatFeatureFlags features);
+
+/**
+ * Generate mipmaps using the GPU. We need a command buffer and a queue to
+ * submit the instructions to.
+ * It should be submitted to a queue with graphics capability for the Blit
+ * command to work.
+ * It expects old image layout to be TransferDstOptimal. It will transition to
+ * ShaderReadOnlyOptimal when done
+ */
+void generate_mipmaps(vk::PhysicalDevice physical_device,
+                      vk::CommandBuffer command_buffer, vk::Image image,
+                      vk::Queue graphics_queue, vk::Format image_format,
+                      uint32_t tex_width, uint32_t tex_height,
+                      std::uint32_t mip_levels);
+
 } // namespace ice_image
 
 #endif

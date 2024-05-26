@@ -1,6 +1,7 @@
 #include "ice_texture.hpp"
 #include "../data_buffers.hpp"
 #include "../descriptors.hpp"
+#include "images/ice_image.hpp"
 
 namespace ice_image {
 
@@ -18,17 +19,24 @@ void Texture::load(const TextureCreationInput &input) {
 
   load();
 
+  // Calculate mip levels
+  mip_levels = static_cast<std::uint32_t>(
+      std::floor(std::log2(std::max(width, height))));
+
   ImageCreationInput image_input{.logical_device = logical_device,
                                  .physical_device = physical_device,
                                  .width = static_cast<std::uint32_t>(width),
                                  .height = static_cast<std::uint32_t>(height),
                                  .tiling = vk::ImageTiling::eOptimal,
-                                 .usage = vk::ImageUsageFlagBits::eTransferDst |
+                                 .usage = vk::ImageUsageFlagBits::eTransferSrc |
+                                          vk::ImageUsageFlagBits::eTransferDst |
                                           vk::ImageUsageFlagBits::eSampled,
                                  .memory_properties =
                                      vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                 .format = vk::Format::eR8G8B8A8Unorm,
-                                 .array_count = 1};
+                                 /* .format = vk::Format::eR8G8B8A8Unorm, */
+                                 .format = vk::Format::eR8G8B8A8Srgb,
+                                 .array_count = 1,
+                                 .mip_levels = mip_levels};
 
   image = make_image(image_input);
 #ifndef NDEBUG
@@ -98,7 +106,8 @@ void Texture::populate() {
       .queue = queue,
       .image = image,
       .old_layout = vk::ImageLayout::eUndefined,
-      .new_layout = vk::ImageLayout::eTransferDstOptimal};
+      .new_layout = vk::ImageLayout::eTransferDstOptimal,
+      .mip_levels = mip_levels};
 
   transition_image_layout(transition_job);
 
@@ -111,9 +120,14 @@ void Texture::populate() {
 
   copy_buffer_to_image(copy_job);
 
-  transition_job.old_layout = vk::ImageLayout::eTransferDstOptimal;
-  transition_job.new_layout = vk::ImageLayout::eShaderReadOnlyOptimal;
-  transition_image_layout(transition_job);
+  // no need to transition, this will transition to eShaderReadOnlyOptimal when
+  // done.
+  ice_image::generate_mipmaps(physical_device, command_buffer, image, queue,
+                              vk::Format::eR8G8B8A8Srgb, width, height,
+                              mip_levels);
+#ifndef NDEBGUG
+  std::cout << "Finished generating mipmaps\n";
+#endif
 
   // Now the staging buffer can be destroyed
   logical_device.freeMemory(staging_buffer.buffer_memory);
@@ -122,8 +136,9 @@ void Texture::populate() {
 
 void Texture::make_view() {
   image_view = make_image_view(
-      logical_device, image, vk::Format::eR8G8B8A8Unorm,
-      vk::ImageAspectFlagBits::eColor, vk::ImageViewType::e2D, 1);
+      logical_device, image,
+      /* vk::Format::eR8G8B8A8Unorm, */ vk::Format::eR8G8B8A8Srgb,
+      vk::ImageAspectFlagBits::eColor, vk::ImageViewType::e2D, 1, mip_levels);
 }
 
 void Texture::make_sampler() {
@@ -137,10 +152,12 @@ void Texture::make_sampler() {
       .addressModeW = vk::SamplerAddressMode::eRepeat,
       .anisotropyEnable = false,
       .maxAnisotropy = 1.0f,
-
       .compareEnable = false,
       .compareOp = vk::CompareOp::eAlways,
+      .minLod = 0,
+      .maxLod = static_cast<float>(mip_levels),
       .borderColor = vk::BorderColor::eIntOpaqueBlack,
+
       .unnormalizedCoordinates = false};
 
   try {

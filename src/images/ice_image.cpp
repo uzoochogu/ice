@@ -1,3 +1,4 @@
+#include "commands.hpp"
 #include "config.hpp"
 #define STB_IMAGE_IMPLEMENTATION
 #include "../commands.hpp"
@@ -14,7 +15,7 @@ vk::Image make_image(const ImageCreationInput &input) {
       .format = input.format,
       .extent = vk::Extent3D(input.width, input.height, 1),
 
-      .mipLevels = 1,
+      .mipLevels = input.mip_levels,
       .arrayLayers = input.array_count,
 
       .samples = vk::SampleCountFlagBits::e1,
@@ -75,7 +76,7 @@ void transition_image_layout(ImageLayoutTransitionJob transition_job) {
   vk::ImageSubresourceRange access{.aspectMask =
                                        vk::ImageAspectFlagBits::eColor,
                                    .baseMipLevel = 0,
-                                   .levelCount = 1,
+                                   .levelCount = transition_job.mip_levels,
                                    .baseArrayLayer = 0,
                                    .layerCount = transition_job.array_count};
 
@@ -142,7 +143,8 @@ void copy_buffer_to_image(const BufferImageCopyJob &copy_job) {
 vk::ImageView make_image_view(vk::Device logical_device, vk::Image image,
                               vk::Format format, vk::ImageAspectFlags aspect,
                               vk::ImageViewType view_type,
-                              std::uint32_t array_count) {
+                              std::uint32_t array_count,
+                              std::uint32_t mip_levels) {
   vk::ImageViewCreateInfo create_info = {
       .image = image,
       .viewType = view_type,
@@ -154,7 +156,7 @@ vk::ImageView make_image_view(vk::Device logical_device, vk::Image image,
       .subresourceRange = {
           .aspectMask = aspect,
           .baseMipLevel = 0,
-          .levelCount = 1,
+          .levelCount = mip_levels,
           .baseArrayLayer = 0,
           .layerCount = array_count,
       }};
@@ -186,6 +188,122 @@ vk::Format find_supported_format(vk::PhysicalDevice physical_device,
     }
   }
   throw std::runtime_error("Unable to find suitable format");
+}
+
+void generate_mipmaps(vk::PhysicalDevice physical_device,
+                      vk::CommandBuffer command_buffer, vk::Image image,
+                      vk::Queue graphics_queue, vk::Format image_format,
+                      uint32_t tex_width, uint32_t tex_height,
+                      std::uint32_t mip_levels) {
+
+  // Check if image format support linear blitting
+  vk::FormatProperties format_properties =
+      physical_device.getFormatProperties(image_format);
+
+  if (!(format_properties.optimalTilingFeatures &
+        vk::FormatFeatureFlagBits::eSampledImageFilterLinear)) {
+    // may introduce a software CPU side blitting rather than run time errors
+    throw std::runtime_error(
+        "texture image format does not support linear blitting");
+  }
+
+  ice::start_job(command_buffer);
+
+  // reused for the several transitions
+  vk::ImageMemoryBarrier barrier{
+
+      .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+      .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+      .image = image,
+      .subresourceRange = {.aspectMask = vk::ImageAspectFlagBits::eColor,
+                           .levelCount = 1,
+                           .baseArrayLayer = 0,
+                           .layerCount = 1}};
+
+  std::int32_t mip_width = tex_width;
+  std::int32_t mip_height = tex_height;
+
+  for (std::uint32_t i = 1; i < mip_levels; i++) {
+    // transition level i - 1 to TRANSFER_SRC_OPTIMAL.
+    // This transition will wait for the level to be filled either from
+    // previous blit command or from vkCmdCopyBufferToImage.
+    // The current blit command will wait on this transition
+    barrier.subresourceRange.baseMipLevel = i - 1;
+    barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal; // eUndefined
+    barrier.newLayout = vk::ImageLayout::eTransferSrcOptimal;
+    barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+    barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
+
+    command_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                   vk::PipelineStageFlagBits::eTransfer,
+                                   vk::DependencyFlags(), 0, nullptr, 0,
+                                   nullptr, 1, &barrier);
+
+    // regions to be used in the blit operation.
+    vk::ImageBlit blit{
+        .srcSubresource =
+            {
+                .aspectMask = vk::ImageAspectFlagBits::eColor,
+                .mipLevel = i - 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+
+        .dstSubresource = {.aspectMask = vk::ImageAspectFlagBits::eColor,
+                           .mipLevel = i,
+                           .baseArrayLayer = 0,
+                           .layerCount = 1}};
+    // The 2 elements of the srcOffsets array determine the 3D region that
+    // data will be blitted from . 2D image has a depth of 1.
+    blit.srcOffsets[0] = {0, 0, 0};
+    blit.srcOffsets[1] = {mip_width, mip_height, 1};
+
+    blit.dstOffsets[0] = {0, 0, 0};
+    blit.dstOffsets[1] = {mip_width > 1 ? mip_width / 2 : 1,
+                          mip_height > 1 ? mip_height / 2 : 1, 1};
+
+    // record blit command
+    // blitting between different levels of the same image. The source mip level
+    // was just transitioned to VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL and the
+    // destination level is still in VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL from
+    // createTextureImage. vk::Filter::eLinear to enable interpolation.
+    command_buffer.blitImage(image, vk::ImageLayout::eTransferSrcOptimal, image,
+                             vk::ImageLayout::eTransferDstOptimal, blit,
+                             vk::Filter::eLinear);
+
+    barrier.oldLayout = vk::ImageLayout::eTransferSrcOptimal;
+    barrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    barrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
+    barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+
+    // waits for the current blit command to finish.
+    // All sampling operation will wait on this transition to finish.
+    command_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                   vk::PipelineStageFlagBits::eFragmentShader,
+                                   vk::DependencyFlags(), 0, nullptr, 0,
+                                   nullptr, 1, &barrier);
+
+    // ensure it can never become 0 especially for non-square images
+    if (mip_width > 1)
+      mip_width /= 2;
+    if (mip_height > 1)
+      mip_height /= 2;
+  }
+
+  // transition the last mip level from TransferDstOptimal to
+  // ShaderReadOnlyOptimal.
+  barrier.subresourceRange.baseMipLevel = mip_levels - 1;
+  barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal; // eUndefined
+  barrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+  barrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
+  barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
+
+  command_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                 vk::PipelineStageFlagBits::eFragmentShader,
+                                 vk::DependencyFlags(), 0, nullptr, 0, nullptr,
+                                 1, &barrier);
+
+  ice::end_job(command_buffer, graphics_queue);
 }
 
 } // namespace ice_image
