@@ -72,7 +72,6 @@ VulkanIce::~VulkanIce() {
 
 #ifndef NDEBUG
   instance.destroyDebugUtilsMessengerEXT(debug_messenger, nullptr, dldi);
-  DestroyDebugUtilsMessengerEXT(instance, debug_messenger_c_api, nullptr);
 #endif
   instance.destroySurfaceKHR(surface);
   instance.destroy();
@@ -832,7 +831,7 @@ void VulkanIce::make_debug_messenger() {
   }
   std::cout << "Making debug messenger\n\n" << std::endl;
   // fill structure with details about the messenger and its callback
-  vk::DebugUtilsMessengerCreateInfoEXT createInfo = {
+  vk::DebugUtilsMessengerCreateInfoEXT create_info = {
       /* .flags = vk::DebugUtilsMessengerCreateFlagsEXT(), */
       .messageSeverity =
           /* exclude Info bit */
@@ -846,33 +845,15 @@ void VulkanIce::make_debug_messenger() {
       .pfnUserCallback = VulkanIce::debugCallback};
 
   std::cout << std::format("Message Severity: {}\nMessage Type: {}\n",
-                           vk::to_string(createInfo.messageSeverity),
-                           vk::to_string(createInfo.messageType))
+                           vk::to_string(create_info.messageSeverity),
+                           vk::to_string(create_info.messageType))
             << std::endl;
   debug_messenger =
-      instance.createDebugUtilsMessengerEXT(createInfo, nullptr, dldi);
+      instance.createDebugUtilsMessengerEXT(create_info, nullptr, dldi);
 
   if (debug_messenger == nullptr) {
     throw std::runtime_error("failed to set up debug messenger!");
   }
-
-  // created Debug messenger with C-API
-  VkDebugUtilsMessengerCreateInfoEXT debugInfo{
-      .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-
-      .messageSeverity =
-          /* exclude Info bit */
-      /*       vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo | */
-      VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-      VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-      VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-      .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                     VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                     VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-      .pfnUserCallback = VulkanIce::debugCallback,
-      .pUserData = nullptr};
-  CreateDebugUtilsMessengerEXT(instance, &debugInfo, nullptr,
-                               &debug_messenger_c_api);
 }
 #endif
 

@@ -20,34 +20,7 @@
 
 namespace ice {
 
-// Loads and Wraps around vkCreateDebugUtilsMessengerEXT, creating
-// vkDebugUtilsMessengerEXT object
-static VkResult CreateDebugUtilsMessengerEXT(
-    VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
-    const VkAllocationCallbacks *pAllocator,
-    VkDebugUtilsMessengerEXT *pDebugMessenger) {
-  auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-      instance, "vkCreateDebugUtilsMessengerEXT");
-  if (func != nullptr) { // instance is passed since debug messenger is
-                         // specific to it and its layers
-    return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
-  } else { // return nullptr if it couldn't be loaded
-    return VK_ERROR_EXTENSION_NOT_PRESENT;
-  }
-}
-
-static void
-DestroyDebugUtilsMessengerEXT(VkInstance instance,
-                              VkDebugUtilsMessengerEXT debugMessenger,
-                              const VkAllocationCallbacks *pAllocator) {
-  auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-      instance, "vkDestroyDebugUtilsMessengerEXT");
-  if (func != nullptr) {
-    func(instance, debugMessenger, pAllocator);
-  }
-}
-
-// @brief Abstraction over Vulkan initialization
+// Abstraction over Vulkan initialization
 class VulkanIce {
 public:
 #ifdef NDEBUG
@@ -56,19 +29,19 @@ public:
   const bool enable_validation_layers = true;
   void make_debug_messenger();
 
+  // C-API
   static VKAPI_ATTR VkBool32 VKAPI_CALL
   debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                 VkDebugUtilsMessageTypeFlagsEXT messageType,
                 const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
                 void *pUserData) {
-    std::cout << "From Debug Callback!!!!" << std::endl;
-    std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+    std::cout << "\nFrom Debug Callback!!!!" << std::endl;
+    std::cerr << "validation layer: \n" << pCallbackData->pMessage << std::endl;
     return VK_FALSE;
   }
 
   // debug callback
   vk::DebugUtilsMessengerEXT debug_messenger{nullptr};
-  VkDebugUtilsMessengerEXT debug_messenger_c_api{nullptr};
 #endif
 
   VulkanIce(IceWindow &window);
