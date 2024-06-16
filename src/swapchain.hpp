@@ -2,11 +2,12 @@
 #define SWAPCHAIN_HPP
 
 #include "./images/ice_image.hpp"
+#include "camera.hpp"
 #include "config.hpp"
 #include "data_buffers.hpp"
 #include "queue.hpp"
-#include "ubo.hpp"
 #include "windowing.hpp"
+
 
 namespace ice {
 
