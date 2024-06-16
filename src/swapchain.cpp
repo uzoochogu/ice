@@ -1,8 +1,9 @@
 #include "swapchain.hpp"
 
+#include "camera.hpp"
 #include "config.hpp"
 #include "images/ice_image.hpp"
-#include "ubo.hpp"
+
 
 namespace ice {
 void SwapChainFrame::make_descriptor_resources() {

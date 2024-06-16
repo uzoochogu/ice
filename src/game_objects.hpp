@@ -9,7 +9,12 @@
                                            // requirements
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/rotate_vector.hpp>
+#include <glm/gtx/vector_angle.hpp>
 
+#ifndef NDEBUG
+#include <glm/gtx/string_cast.hpp>
+#endif
 namespace ice {
 // Data representing a game object e.g a model
 struct GameObject {

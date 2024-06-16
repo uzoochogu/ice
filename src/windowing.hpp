@@ -29,6 +29,7 @@ public:
   IceWindow(int width, int height, std::string name);
   ~IceWindow();
 
+  // Windowing API adaptors
   GLFWwindow *get_window() const { return window; }
   bool should_close() { return glfwWindowShouldClose(window); }
 
