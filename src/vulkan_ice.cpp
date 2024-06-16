@@ -1,10 +1,10 @@
 #include "vulkan_ice.hpp"
 #include "game_objects.hpp"
 #include "mesh.hpp"
-#include "ubo.hpp"
 
 namespace ice {
-VulkanIce::VulkanIce(IceWindow &window) : window{window} {
+VulkanIce::VulkanIce(IceWindow &window)
+    : window{window}, camera{800, 600, glm::vec3(-1.0f, 0.0f, 5.0f)} {
   make_instance();
 
   // create surface, connect to vulkan
@@ -223,6 +223,10 @@ void VulkanIce::setup_swapchain(vk::SwapchainKHR *old_swapchain) {
   swapchain_format = bundle.format;
   swapchain_extent =
       bundle.frames[0].extent; // at least one frame is guaranteed
+
+  // update camera dims
+  camera.set_width(window.get_framebuffer_size().width);
+  camera.set_height(window.get_framebuffer_size().height);
 
   // set max frames
   max_frames_in_flight = static_cast<uint32_t>(swapchain_frames.size());
@@ -552,42 +556,23 @@ void VulkanIce::end_worker_threads() {
 
 void VulkanIce::prepare_frame(std::uint32_t image_index, Scene *scene) {
 
+  // camera code
+  camera.inputs(&window);
+  // increase far plane distance to prevent clipping
+  camera.update_matrices(45.0f, 0.1f, 100000.0f);
+
   SwapChainFrame &_frame =
       swapchain_frames[image_index]; // swapchain frame alias
 
-  // clang-format off
-
-  // prep camera vectors
-  glm::vec4 cam_vec_forwards = {1.0f, 0.0f, 0.0f, 0.0f};
-  glm::vec4 cam_vec_right    = {0.0f, -1.0f, 0.0f, 0.0f};
-  glm::vec4 cam_vec_up       = {0.0f, 0.0f, 1.0f, 0.0f}; // z  up
-  _frame.camera_vector_data = {
-                                .forwards = cam_vec_forwards,
-                                .right = cam_vec_right,
-                                .up = cam_vec_up,
-  };
+  // update camera vector
+  _frame.camera_vector_data = camera.get_camera_vector();
 
   memcpy(_frame.camera_vector_write_location, &(_frame.camera_vector_data),
          sizeof(CameraVectors));
 
-  glm::vec3 eye    = {-1.0f, 0.0f, 5.0f};
-  glm::vec3 center = { 1.0f, 0.0f, 5.0f }; //{ forwards, , slightly above }
-  glm::vec3 up     = {0.0f, 0.0f, 1.0f};
-  glm::mat4 view   = glm::lookAt(eye, center, up);
+  // update camera matrix
+  _frame.camera_matrix_data = camera.get_camera_matrix();
 
-  // clang-format on
-
-  // increase far distance to prevent clipping
-  glm::mat4 projection =
-      glm::perspective(glm::radians(45.0f),
-                       static_cast<float>(swapchain_extent.width) /
-                           static_cast<float>(swapchain_extent.height),
-                       0.1f, 100.0f);
-  projection[1][1] *= -1;
-
-  _frame.camera_matrix_data = {.view = view,
-                               .projection = projection,
-                               .view_projection = projection * view};
   memcpy(_frame.camera_matrix_write_location, &(_frame.camera_matrix_data),
          sizeof(CameraMatrices));
 

@@ -17,6 +17,7 @@
 #include "synchronization.hpp"
 #include "triangle_mesh.hpp"
 #include "windowing.hpp"
+#include "camera.hpp"
 
 namespace ice {
 
@@ -102,6 +103,7 @@ private:
   MeshCollator *meshes;
   std::unordered_map<MeshTypes, ice_image::Texture *> materials;
   ice_image::CubeMap *cube_map;
+  Camera camera;
 
   // Job System
   bool done = false;
