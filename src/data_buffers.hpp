@@ -70,7 +70,7 @@ inline BufferBundle create_buffer(const BufferCreationInput &buffer_input) {
   // Error handling with nullptr
   if ((buffer_bundle.buffer = buffer_input.logical_device.createBuffer(
            buffer_info, nullptr)) == nullptr) {
-    throw std::runtime_error("failed to create vertex buffer!");
+    throw std::runtime_error("failed to create buffer!");
   }
 
   // Memory requirements
@@ -121,6 +121,47 @@ inline vk::Result copy_buffer(const BufferBundle &src_buffer,
   vk::Result result = queue.submit(1, &submit_info, nullptr);
   queue.waitIdle();
   return result;
+}
+ 
+template <typename T>
+inline BufferBundle
+create_device_local_buffer(vk::PhysicalDevice physical_device,
+                           vk::Device device, vk::CommandBuffer command_buffer,
+                           vk::Queue queue, vk::BufferUsageFlagBits usage_bit,
+                           const std::vector<T> &data) {
+  // host local buffer initialization
+  BufferCreationInput buffer_input = {.size = data.size() * sizeof(T),
+                                      .usage =
+                                          vk::BufferUsageFlagBits::eTransferSrc,
+                                      .logical_device = device,
+                                      .physical_device = physical_device};
+  ice::BufferBundle staging_buffer_bundle = ice::create_buffer(buffer_input);
+
+  void *memory_location = device.mapMemory(staging_buffer_bundle.buffer_memory,
+                                           0, buffer_input.size);
+  memcpy(memory_location, data.data(), buffer_input.size);
+  device.unmapMemory(staging_buffer_bundle.buffer_memory);
+
+  // device local buffer initialization
+  buffer_input.usage = vk::BufferUsageFlagBits::eTransferDst | usage_bit;
+  buffer_input.memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal;
+  ice::BufferBundle buffer_bundle = create_buffer(buffer_input);
+
+  // copy
+  vk::Result result = copy_buffer(staging_buffer_bundle, buffer_bundle,
+                                  buffer_input.size, queue, command_buffer);
+  if (result != vk::Result::eSuccess) {
+#ifndef NDEBUG
+    std::cout << std::format("{} copy operation  creation failed!\n",
+                             vk::to_string(usage_bit));
+#endif
+  }
+
+  // destroy staging buffer
+  device.destroyBuffer(staging_buffer_bundle.buffer);
+  device.freeMemory(staging_buffer_bundle.buffer_memory);
+
+  return buffer_bundle;
 }
 } // namespace ice
 #endif

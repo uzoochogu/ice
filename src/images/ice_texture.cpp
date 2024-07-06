@@ -1,3 +1,5 @@
+#define TINYGLTF_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "ice_texture.hpp"
 #include "../data_buffers.hpp"
 #include "../descriptors.hpp"
@@ -5,23 +7,58 @@
 
 namespace ice_image {
 
-Texture::Texture(const TextureCreationInput &input) { load(input); }
+Texture::Texture(const TextureCreationInput &input) { load(input, nullptr); }
 
-void Texture::load(const TextureCreationInput &input) {
+Texture::Texture(const TextureCreationInput &input,
+                 std::shared_ptr<tinygltf::Image> gltf_image) {
+  load(input, gltf_image);
+}
+
+void Texture::load(const TextureCreationInput &input,
+                   std::shared_ptr<tinygltf::Image> gltf_image) {
 
   logical_device = input.logical_device;
   physical_device = input.physical_device;
-  filename = input.filenames[0];
+  filename = !input.filenames.empty() ? input.filenames[0].c_str() : "\0";
   command_buffer = input.command_buffer;
   queue = input.queue;
   layout = input.layout;
   descriptor_pool = input.descriptor_pool;
 
-  load();
+  if (gltf_image == nullptr) {
+    // load from file
+    load();
+  } else {
+#ifndef NDEBUG
+    std::cout << "\nLoading Embedded Textures .....\n";
+#endif
+    width = gltf_image->width;
+    height = gltf_image->height;
+    channels = std::min(4, gltf_image->component);
+    pixels = static_cast<stbi_uc *>(new unsigned char[width * height * 4]);
+
+    // RGBA format
+    if (channels == 4) {
+      memcpy(pixels, gltf_image->image.data(), width * height * 4);
+    } else {
+      // Convert to RGBA
+      for (int i = 0; i < width * height; ++i) {
+        for (int j = 0; j < channels; ++j) {
+          pixels[i * 4 + j] = gltf_image->image[i * channels + j];
+        }
+        // Set alpha to 255 if it's not present in the original
+        if (channels < 4) {
+          pixels[i * 4 + 3] = 255;
+        }
+      }
+      channels = 4;
+    }
+  }
 
   // Calculate mip levels
   mip_levels = static_cast<std::uint32_t>(
-      std::floor(std::log2(std::max(width, height))));
+                   std::floor(std::log2(std::max(width, height)))) +
+               1; // at least 1
 
   ImageCreationInput image_input{.logical_device = logical_device,
                                  .physical_device = physical_device,
@@ -47,7 +84,11 @@ void Texture::load(const TextureCreationInput &input) {
 
   populate();
 
-  free(pixels);
+  if (gltf_image == nullptr) {
+    stbi_image_free(pixels);
+  } else {
+    delete[] pixels;
+  }
 
   make_view();
 
@@ -72,13 +113,22 @@ void Texture::load() {
   std::cout << "\nLoading Textures.....\n";
 #endif
   pixels = stbi_load(filename, &width, &height, &channels, STBI_rgb_alpha);
-  if (!pixels) {
-    std::cout << std::format("Unable to load: {}", filename) << std::endl;
+  if (pixels == nullptr) {
+    std::cout << std::format("Unable to load: {}, reason: {}", filename,
+                             stbi_failure_reason())
+              << std::endl;
+    width = height = 10;
+    channels = 4;
+#ifndef NDEBUG
+    std::cout << std::format("Allocated random image of size {} x {}\n", width,
+                             height);
+#endif
+    pixels = new stbi_uc[width * height * channels];
+    memset(pixels, 255, width * height * channels);
   }
 }
 
 void Texture::populate() {
-
   // First create a CPU-visible buffer...
   ice::BufferCreationInput input{
       .size = static_cast<size_t>(width * height * 4),

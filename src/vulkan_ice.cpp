@@ -4,7 +4,7 @@
 
 namespace ice {
 VulkanIce::VulkanIce(IceWindow &window)
-    : window{window}, camera{800, 600, glm::vec3(-1.0f, 0.0f, 5.0f)} {
+    : window{window}, camera{800, 600, glm::vec3(6.5f, -6.5f, 5.0f)} {
   make_instance();
 
   // create surface, connect to vulkan
@@ -61,6 +61,7 @@ VulkanIce::~VulkanIce() {
   device.destroyDescriptorPool(mesh_descriptor_pool);
 
   delete meshes;
+  delete gltf_mesh;
 
   for (const auto &[key, texture] : materials) {
     delete texture;
@@ -527,7 +528,6 @@ void VulkanIce::make_assets() {
 
   // Sky Texture
   texture_info.layout = mesh_set_layout[PipelineType::SKY];
-  /* texture_info.descriptor_pool = mesh_descriptor_pool; */
   texture_info.filenames = {{
       "resources/textures/sky_front.png",  // x+
       "resources/textures/sky_back.png",   // x-
@@ -537,6 +537,39 @@ void VulkanIce::make_assets() {
       "resources/textures/sky_top.png",    // z-
   }};
   cube_map = new ice_image::CubeMap(texture_info);
+
+  // GltfMesh
+  // Create a larger descriptor pool for GLTF mesh textures
+  DescriptorSetLayoutData gltf_texture_layout_bindings = {
+      .count = 1,
+      .indices = {0},
+      .types = {vk::DescriptorType::eCombinedImageSampler},
+      .descriptor_counts = {1},
+      .stages = {vk::ShaderStageFlagBits::eFragment}};
+
+  vk::DescriptorPool gltf_descriptor_pool =
+      make_descriptor_pool(device, 1000, gltf_texture_layout_bindings);
+
+  // TRS
+  glm::mat4 pre_transform =
+      glm::translate(glm::mat4(1.0f), glm::vec3(15.0f, 3.0f, 5.0f));
+
+  pre_transform = glm::rotate(pre_transform, glm::radians(120.0f),
+                              glm::vec3(1.0f, 1.0f, 1.0f));
+  pre_transform = glm::rotate(pre_transform, glm::radians(180.0f),
+                              glm::vec3(0.0f, 1.0f, 0.0f));
+
+  pre_transform = glm::scale(pre_transform, glm::vec3(3.0f, 3.0f, 3.0f));
+
+  // make GLTF MESH
+  gltf_mesh = new GltfMesh(
+      physical_device, device, main_command_buffer, graphics_queue,
+      mesh_set_layout[PipelineType::STANDARD], gltf_descriptor_pool,
+      // "resources/models/Box.gltf", pre_transform);
+      // "resources/models/ToyCar.glb", pre_transform); // very tiny increase
+      // scale to see it
+      // "resources/models/Suzanne.gltf", pre_transform);
+      "resources/models/DamagedHelmet.gltf", pre_transform);
 
 #ifndef NDEBUG
   std::cout << "Finished making assets" << std::endl;
@@ -803,6 +836,30 @@ void VulkanIce::record_scene_draw_commands(vk::CommandBuffer command_buffer,
   for (const auto &[mesh_types, positions] : scene->positions) {
     render_mesh(command_buffer, mesh_types, start_instance,
                 static_cast<uint32_t>(positions.size()));
+  }
+
+  // Bind GltfMesh buffers and draw
+  for (size_t i = 0; i < gltf_mesh->mesh_buffers.size(); ++i) {
+    const auto &mesh_buffer = gltf_mesh->mesh_buffers[i];
+
+    // Bind vertex buffer
+    vk::Buffer vertex_buffers[] = {mesh_buffer.vertex_buffer.buffer};
+    vk::DeviceSize offsets[] = {0};
+    command_buffer.bindVertexBuffers(0, 1, vertex_buffers, offsets);
+
+    // Bind index buffer
+    command_buffer.bindIndexBuffer(mesh_buffer.index_buffer.buffer, 0,
+                                   vk::IndexType::eUint32);
+
+    // Bind texture
+    if (i < gltf_mesh->textures.size() && gltf_mesh->textures[i] != nullptr) {
+      gltf_mesh->textures[i]->use(command_buffer,
+                                  pipeline_layout[PipelineType::STANDARD]);
+    }
+
+    // Draw the mesh
+    uint32_t index_count = gltf_mesh->index_counts[i];
+    command_buffer.drawIndexed(index_count, 1, 0, 0, 0);
   }
 
   command_buffer.endRenderPass();

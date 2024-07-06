@@ -22,8 +22,11 @@ class MeshCollator {
 public:
   MeshCollator() = default;
   ~MeshCollator();
+  // takes in various MeshTypes and adds data concatenate Vertex and indices
+  // data
   void consume(MeshTypes type, const std::vector<Vertex> &vertex_data,
                const std::vector<std::uint32_t> &index_data);
+  // populates vertex and index BufferBundles
   void finalize(const VertexBufferFinalizationInput &finalization_chunk);
   BufferBundle vertex_buffer, index_buffer;
   std::unordered_map<MeshTypes, std::uint32_t> index_lump_offsets;
