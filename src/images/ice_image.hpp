@@ -14,7 +14,7 @@ struct TextureCreationInput {
   vk::Queue queue;
   vk::DescriptorSetLayout layout;
   vk::DescriptorPool descriptor_pool;
-  std::vector<const char *> filenames;
+  std::vector<std::string> filenames;
 };
 
 // VkImage creation struct

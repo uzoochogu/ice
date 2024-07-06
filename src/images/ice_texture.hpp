@@ -3,6 +3,7 @@
 
 #include "../config.hpp"
 #include "ice_image.hpp"
+#include <tiny_gltf.h>
 
 namespace ice_image {
 
@@ -14,11 +15,15 @@ public:
 
   // Construct and load
   Texture(const TextureCreationInput &input);
+  Texture(const TextureCreationInput &input,
+          std::shared_ptr<tinygltf::Image> gltf_image);
 
   void use(vk::CommandBuffer command_buffer,
            vk::PipelineLayout pipeline_layout);
 
-  void load(const TextureCreationInput &input); // public load
+  void
+  load(const TextureCreationInput &input,
+       std::shared_ptr<tinygltf::Image> gltf_image = nullptr); // public load
   ~Texture();
 
 private:

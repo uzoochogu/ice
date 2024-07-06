@@ -1,4 +1,5 @@
 #include "camera.hpp"
+#include <GLFW/glfw3.h>
 
 namespace ice {
 
@@ -27,9 +28,51 @@ void Camera::inputs(IceWindow *ice_window) {
   if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS) {
     // Resets to origin
     position = DEFAULT_POSITION;
-    orientation = glm::vec3(2.0f, 0.0f, 0.0f);
+    orientation = glm::vec3(2.0f, 1.0f, 0.0f);
     up = {0.0f, 0.0f, 1.0f};
+    speed = default_speed = 0.005f;
+    sensitivity = 5.0f;
   }
+  if (glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS) {
+    // increase speed and sensitivity
+    default_speed += 0.01f;
+    sensitivity += 0.50f;
+  }
+  if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS) {
+    // decrease speed and sensitivity
+    default_speed = std::max(default_speed - 0.01f, 0.0f);
+    sensitivity = std::max(sensitivity - 0.50f, 0.0f);
+  }
+  if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS) {
+    // reset speed and sensitivity
+    speed = default_speed = 0.005f;
+    sensitivity = 5.0f;
+  }
+#ifndef NDEBUG
+  if (glfwGetKey(window, GLFW_KEY_F12) == GLFW_PRESS) {
+    glfwWaitEvents();
+    if (glfwGetKey(window, GLFW_KEY_F12) == GLFW_RELEASE) {
+      // Dump values to console
+      std::cout << std::format("\n\nCamera Data:\n"
+                               "Position:\n{}\n"
+                               "Orientation:\n{}\n"
+                               "Speed:\n{}\n"
+                               "Sensitivity:\n{}\n"
+                               "++++++++++++++\n"
+                               "Camera Matrix:\n"
+                               "++++++++++++++\n"
+                               "view:\n{}\n"
+                               "projection:\n{}\n"
+                               "view-projection:\n{}\n",
+                               glm::to_string(position),
+                               glm::to_string(orientation), speed, sensitivity,
+                               glm::to_string(camera_matrix.view),
+                               glm::to_string(camera_matrix.projection),
+                               glm::to_string(camera_matrix.projection))
+                << std::endl;
+    }
+  }
+#endif
   if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
     position += speed * orientation;
   }
@@ -51,7 +94,7 @@ void Camera::inputs(IceWindow *ice_window) {
   if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
     speed = 0.02f;
   } else if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_RELEASE) {
-    speed = 0.005f;
+    speed = default_speed;
   }
 
   // Handles mouse inputs
@@ -79,15 +122,8 @@ void Camera::inputs(IceWindow *ice_window) {
                   static_cast<float>(width);
 
     // Calculates upcoming vertical change in the orientation
-    glm::vec3 new_orientation =
-        glm::rotate(orientation, glm::radians(-rot_x),
-                    glm::normalize(glm::cross(orientation, up)));
-
-    // Decides whether or not the next vertical orientation is legal or not
-    if (abs(glm::angle(new_orientation, up) - glm::radians(90.0f)) <=
-        glm::radians(85.0f)) {
-      orientation = new_orientation;
-    }
+    orientation = glm::rotate(orientation, glm::radians(-rot_x),
+                              glm::normalize(glm::cross(orientation, up)));
 
     // Rotates the orientation left and right
     orientation = glm::rotate(orientation, glm::radians(-rot_y), up);

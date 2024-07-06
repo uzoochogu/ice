@@ -1,6 +1,7 @@
 {
   "name": "imgui-vulkan-app",
   "version": "0.0.1",
+  "builtin-baseline": "a1a1cbc975abf909a6c8985a6a2b8fe20bbd9bd6",
   "dependencies": [
     {
       "name": "glfw3",
@@ -13,7 +14,7 @@
     {
       "name": "stb",
       "version>=": "2023-04-11#1"
-    }
-  ],
-  "builtin-baseline": "a1a1cbc975abf909a6c8985a6a2b8fe20bbd9bd6"
+    },
+    "tinygltf"
+  ]
 }

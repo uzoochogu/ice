@@ -45,7 +45,7 @@ private:
   // Stores the main vectors of the camera
   glm::vec3 position;
   const glm::vec3 DEFAULT_POSITION;
-  glm::vec3 orientation = glm::vec3(2.0f, 0.0f, 0.0f);
+  glm::vec3 orientation = glm::vec3(2.0f, 1.0f, 0.0f);
   glm::vec3 up = {0.0f, 0.0f, 1.0f};
 
   // Prevents the camera from jumping around when first clicking left click
@@ -56,6 +56,7 @@ private:
   std::uint32_t height;
 
   // Adjust the speed of the camera and it's sensitivity when looking around
+  float default_speed = 0.005f;
   float speed = 0.005f;
   float sensitivity = 5.0f;
 };

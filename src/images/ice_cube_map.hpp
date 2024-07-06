@@ -22,7 +22,7 @@ private:
   int width, height, channels;
   vk::Device logical_device;
   vk::PhysicalDevice physical_device;
-  std::vector<const char *> filenames;
+  std::vector<std::string> filenames;
   stbi_uc *pixels[FACES_IN_CUBE];
 
   // Resources

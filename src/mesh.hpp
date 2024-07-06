@@ -1,9 +1,13 @@
 #ifndef MESH_HPP
 #define MESH_HPP
 
+#include "data_buffers.hpp"
 #include "game_objects.hpp"
+#include "images/ice_texture.hpp"
+#include "loaders.hpp"
 
 #define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/hash.hpp> // for hashing glm::vec data structures
 
 namespace ice {
@@ -109,6 +113,59 @@ public:
   void read_face_data(const std::vector<std::string> &words);
 
   void read_corner(const std::string &vertex_description);
+};
+
+struct MeshBuffer {
+  ice::BufferBundle vertex_buffer;
+  ice::BufferBundle index_buffer;
+};
+
+// loads mesh data from GLTF, it can represent a whole scene
+class GltfMesh {
+public:
+  GltfMesh() = default; // defers loading
+  ~GltfMesh();
+
+  GltfMesh(vk::PhysicalDevice physical_device, vk::Device device,
+           vk::CommandBuffer command_buffer, vk::Queue queue,
+           vk::DescriptorSetLayout descriptor_set_layout,
+           vk::DescriptorPool descriptor_pool, const char *obj_filepath,
+           glm::mat4 pre_transform);
+
+  // new transform to update the mesh with
+  void update_transforms(glm::mat4 new_transform);
+
+  std::vector<Vertex> vertices;
+  std::vector<uint32_t> indices;
+
+  std::vector<MeshBuffer> mesh_buffers;
+  std::vector<uint32_t> index_counts;
+
+  std::vector<ice_image::Texture *> textures;
+
+private:
+  void load(const char *gltf_filepath);
+  void bind_models();
+  void bind_model_nodes(tinygltf::Node &node,
+                        glm::mat4 parent_transform = glm::mat4(1.0f));
+  void bind_mesh(tinygltf::Mesh &mesh, const glm::mat4 &global_transform);
+  glm::mat4 get_local_transform(const tinygltf::Node &node);
+
+#ifndef NDEBUG
+  void debug_model();
+#endif
+
+  tinygltf::Model model;
+
+  glm::mat4 pre_transform;
+  std::string gltf_filepath;
+
+  vk::PhysicalDevice physical_device;
+  vk::Device device;
+  vk::CommandBuffer command_buffer;
+  vk::Queue queue;
+  vk::DescriptorSetLayout descriptor_set_layout;
+  vk::DescriptorPool descriptor_pool;
 };
 
 } // namespace ice

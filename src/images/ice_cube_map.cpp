@@ -33,20 +33,6 @@ CubeMap::CubeMap(const TextureCreationInput &input) {
 
   load();
 
-  // Error handling for Error in load
-  for (int i = 0; i < FACES_IN_CUBE; ++i) {
-    if (pixels[i] == nullptr) {
-#ifndef NDEBUG
-      width = 1;
-      height = 1;
-      std::cout << std::format(
-          "Empty load in image {},  Allocated random image of size {} x {}\n",
-          i, width, height);
-#endif
-      pixels[i] = new stbi_uc(width * height);
-    }
-  }
-
   ImageCreationInput image_input{
       .logical_device = logical_device,
       .physical_device = physical_device,
@@ -70,7 +56,7 @@ CubeMap::CubeMap(const TextureCreationInput &input) {
   populate();
 
   for (int i = 0; i < FACES_IN_CUBE; ++i) {
-    free(pixels[i]);
+    stbi_image_free(pixels[i]);
   }
 
   make_view();
@@ -96,10 +82,20 @@ void CubeMap::load() {
   std::cout << "\nLoading CubeMaps.....\n";
 #endif
   for (int i = 0; i < FACES_IN_CUBE; i++) {
-    pixels[i] =
-        stbi_load(filenames[i], &width, &height, &channels, STBI_rgb_alpha);
-    if (!pixels[i]) {
+    pixels[i] = stbi_load(filenames[i].c_str(), &width, &height, &channels,
+                          STBI_rgb_alpha);
+    if (pixels[i] == nullptr) {
+      // Error Recovery
       std::cout << std::format("Unable to load: {}", filenames[i]) << std::endl;
+      width = height = 10;
+      channels = 4;
+#ifndef NDEBUG
+      std::cout << std::format(
+          "Empty load in image {},  Allocated random image of size {} x {}\n",
+          i, width, height);
+#endif
+      pixels[i] = new stbi_uc[width * height * channels];
+      memset(pixels[i], 255, width * height * channels);
     }
   }
 }

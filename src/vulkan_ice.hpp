@@ -2,8 +2,10 @@
 #define VULKAN_ICE
 
 #include "config.hpp"
+#include "mesh.hpp"
 #include "queue.hpp"
 
+#include "camera.hpp"
 #include "commands.hpp"
 #include "descriptors.hpp"
 #include "framebuffer.hpp"
@@ -17,7 +19,6 @@
 #include "synchronization.hpp"
 #include "triangle_mesh.hpp"
 #include "windowing.hpp"
-#include "camera.hpp"
 
 namespace ice {
 
@@ -102,6 +103,7 @@ private:
   // std::unique_ptr<MeshCollator> meshes;
   MeshCollator *meshes;
   std::unordered_map<MeshTypes, ice_image::Texture *> materials;
+  GltfMesh *gltf_mesh;
   ice_image::CubeMap *cube_map;
   Camera camera;
 
