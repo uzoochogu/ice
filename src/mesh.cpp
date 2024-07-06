@@ -2,7 +2,6 @@
 #include "data_buffers.hpp"
 #include <filesystem>
 
-
 namespace ice {
 
 ObjMesh::ObjMesh(const char *obj_filepath, const char *mtl_filepath,
