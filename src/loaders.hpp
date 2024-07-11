@@ -34,6 +34,32 @@ inline std::vector<char> read_file(const std::string &filename) {
 inline vk::ShaderModule create_shader_module(std::string filename,
                                              vk::Device device) {
   std::vector<char> source_code = read_file(filename);
+
+  constexpr std::uint32_t SPIRV_MAGIC = 0x07230203;
+  constexpr std::uint32_t SPIRV_MAGIC_REV = 0x03022307;
+  std::uint32_t magic{0};
+
+  if (source_code.size() < sizeof(std::uint32_t)) {
+    throw std::runtime_error("Invalid shader code");
+  } else {
+    memcpy(&magic, source_code.data(), sizeof(magic));
+    if (magic != SPIRV_MAGIC &&
+        magic != SPIRV_MAGIC_REV) { // account for endianness??
+#ifndef NDEBUG
+      std::cout << std::format(
+          "Magic number for spir-v file {} is {:#08x} -- should be {:#08x}\n",
+          filename, magic, SPIRV_MAGIC);
+#endif
+
+      throw std::runtime_error("Incorrect SPIRV_MAGIC");
+    }
+  }
+
+#ifndef NDEBUG
+  std::cout << std::format("Shader has correct SPIR-V magic {:#08x}\n",
+                           SPIRV_MAGIC);
+#endif
+
   vk::ShaderModuleCreateInfo module_info = {
       .flags = vk::ShaderModuleCreateFlags(),
       .codeSize = source_code.size(),
