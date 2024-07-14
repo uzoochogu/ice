@@ -189,43 +189,16 @@ make_graphics_pipeline(const GraphicsPipelineInBundle &specification) {
       .pName = "main"};
 
   // Viewport and Scissor
-  // Dynamic state in command buffer
-  /*   std::vector<vk::DynamicState> dynamic_states =
-    {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
-    vk::PipelineDynamicStateCreateInfo dynamic_state_info{
-        .dynamicStateCount = static_cast<uint32_t>(dynamic_states.size()),
-        .pDynamicStates = dynamic_states.data()};
+  // Dynamic states to be modified in command buffer - at drawing time
+  std::vector<vk::DynamicState> dynamic_states = {vk::DynamicState::eViewport,
+                                                  vk::DynamicState::eScissor};
+  vk::PipelineDynamicStateCreateInfo dynamic_state_info{
+      .dynamicStateCount = static_cast<uint32_t>(dynamic_states.size()),
+      .pDynamicStates = dynamic_states.data()};
 
-    // Specify their count at pipeline  creation time
-    // The actual viewport and scissor rectangle will be later set up at
-    drawing
-    // time
-    vk::PipelineViewportStateCreateInfo viewport_state{.viewportCount = 1,
-                                                       .scissorCount = 1};
-   */
-  // Viewport and Scissor
-  vk::Viewport viewport = {
-      .x = 0.0f,
-      .y = 0.0f,
-      .width = (float)specification.swapchain_extent.width,
-      .height = (float)specification.swapchain_extent.height,
-      .minDepth = 0.0f,
-      .maxDepth = 1.0f,
-  };
-
-  vk::Rect2D scissor = {
-      .offset{
-          .x = 0,
-          .y = 0,
-      },
-      .extent = specification.swapchain_extent,
-  };
-  vk::PipelineViewportStateCreateInfo viewport_state = {
-      .viewportCount = 1,
-      .pViewports = &viewport,
-      .scissorCount = 1,
-      .pScissors = &scissor,
-  };
+  vk::PipelineViewportStateCreateInfo viewport_state{.viewportCount = 1,
+                                                     .scissorCount = 1};
+  pipeline_info.pDynamicState = &dynamic_state_info;
   pipeline_info.pViewportState = &viewport_state;
 
   // Rasterizer
