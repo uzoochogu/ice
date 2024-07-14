@@ -783,6 +783,18 @@ void VulkanIce::record_sky_draw_commands(vk::CommandBuffer command_buffer,
   command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
                               pipeline[PipelineType::SKY]);
 
+  // dynamic viewport and scissor specification
+  vk::Viewport viewport{.x = 0.0f,
+                        .y = 0.0f,
+                        .width = static_cast<float>(swapchain_extent.width),
+                        .height = static_cast<float>(swapchain_extent.height),
+                        .minDepth = 0.0f,
+                        .maxDepth = 1.0f};
+  command_buffer.setViewport(0, 1, &viewport);
+
+  vk::Rect2D scissor{.offset = {0, 0}, .extent = swapchain_extent};
+  command_buffer.setScissor(0, 1, &scissor);
+
   command_buffer.bindDescriptorSets(
       vk::PipelineBindPoint::eGraphics, pipeline_layout[PipelineType::SKY], 0,
       swapchain_frames[image_index].descriptor_sets[PipelineType::SKY],
@@ -821,6 +833,17 @@ void VulkanIce::record_scene_draw_commands(vk::CommandBuffer command_buffer,
 
   command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
                               pipeline[PipelineType::STANDARD]);
+
+  vk::Viewport viewport{.x = 0.0f,
+                        .y = 0.0f,
+                        .width = static_cast<float>(swapchain_extent.width),
+                        .height = static_cast<float>(swapchain_extent.height),
+                        .minDepth = 0.0f,
+                        .maxDepth = 1.0f};
+  command_buffer.setViewport(0, 1, &viewport);
+
+  vk::Rect2D scissor{.offset = {0, 0}, .extent = swapchain_extent};
+  command_buffer.setScissor(0, 1, &scissor);
 
   command_buffer.bindDescriptorSets(
       vk::PipelineBindPoint::eGraphics, pipeline_layout[PipelineType::STANDARD],
