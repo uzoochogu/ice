@@ -122,7 +122,7 @@ inline vk::Result copy_buffer(const BufferBundle &src_buffer,
   queue.waitIdle();
   return result;
 }
- 
+
 template <typename T>
 inline BufferBundle
 create_device_local_buffer(vk::PhysicalDevice physical_device,

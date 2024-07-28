@@ -42,7 +42,7 @@ CubeMap::CubeMap(const TextureCreationInput &input) {
       .usage = vk::ImageUsageFlagBits::eTransferDst |
                vk::ImageUsageFlagBits::eSampled,
       .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
-      .format = vk::Format::eR8G8B8A8Unorm,
+      .format = vk::Format::eR8G8B8A8Srgb,
       .array_count = FACES_IN_CUBE,
       .create_flags = vk::ImageCreateFlagBits::eCubeCompatible};
 
@@ -156,9 +156,9 @@ void CubeMap::populate() {
 }
 
 void CubeMap::make_view() {
-  image_view = make_image_view(
-      logical_device, image, vk::Format::eR8G8B8A8Unorm,
-      vk::ImageAspectFlagBits::eColor, vk::ImageViewType::eCube, FACES_IN_CUBE);
+  image_view = make_image_view(logical_device, image, vk::Format::eR8G8B8A8Srgb,
+                               vk::ImageAspectFlagBits::eColor,
+                               vk::ImageViewType::eCube, FACES_IN_CUBE);
 #ifndef NDEBUG
   std::cout << "Finished Creating the image view for Cube Map\n\n" << std::endl;
 #endif
