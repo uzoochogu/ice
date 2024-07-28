@@ -49,16 +49,14 @@ private:
   glm::vec3 up = {0.0f, 0.0f, 1.0f};
 
   // Prevents the camera from jumping around when first clicking left click
-  bool first_click = true;
+  bool first_click{true}, camera_active{false};
 
   // window
   std::uint32_t width;
   std::uint32_t height;
 
   // Adjust the speed of the camera and it's sensitivity when looking around
-  float default_speed = 0.005f;
-  float speed = 0.005f;
-  float sensitivity = 5.0f;
+  float default_speed{0.005f}, speed = {0.005f}, sensitivity{5.0f};
 };
 
 } // namespace ice

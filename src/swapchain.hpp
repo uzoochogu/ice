@@ -8,7 +8,6 @@
 #include "queue.hpp"
 #include "windowing.hpp"
 
-
 namespace ice {
 
 // @brief Bundles everything related to a swapchain frame: image, image view,
@@ -25,6 +24,7 @@ public:
   vk::Image image;
   vk::ImageView image_view;
   std::unordered_map<PipelineType, vk::Framebuffer> framebuffer;
+  vk::Framebuffer imgui_framebuffer;
   vk::Image depth_buffer;
   vk::DeviceMemory depth_buffer_memory;
   vk::ImageView depth_buffer_view;
@@ -32,6 +32,7 @@ public:
   vk::Extent2D extent;
 
   vk::CommandBuffer command_buffer;
+  vk::CommandBuffer imgui_command_buffer;
 
   // sync objects
   vk::Semaphore image_available, render_finished;
@@ -67,7 +68,7 @@ public:
 
   void write_descriptor_set();
 
-  void destroy();
+  void destroy(vk::CommandPool imgui_command_pool);
 };
 
 // @brief Bundles handles that would be created  with swapchain:

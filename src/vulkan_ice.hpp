@@ -19,6 +19,9 @@
 #include "synchronization.hpp"
 #include "triangle_mesh.hpp"
 #include "windowing.hpp"
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
 
 namespace ice {
 
@@ -37,8 +40,8 @@ public:
                 VkDebugUtilsMessageTypeFlagsEXT messageType,
                 const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
                 void *pUserData) {
-    std::cout << "\nFrom Debug Callback!!!!" << std::endl;
-    std::cerr << "validation layer: \n" << pCallbackData->pMessage << std::endl;
+    std::cout << "\nFrom Debug Callback!!!!\nvalidation layer: \n"
+              << pCallbackData->pMessage << std::endl;
     return VK_FALSE;
   }
 
@@ -50,6 +53,9 @@ public:
   ~VulkanIce();
 
   void render(Scene *scene);
+  void setup_imgui_overlay();
+
+  vk::PhysicalDevice get_physical_device() const { return physical_device; };
 
 private:
   // instance setup
@@ -96,7 +102,7 @@ private:
   QueueFamilyIndices indices;
 
   // utilities for synchronization
-  std::uint32_t max_frames_in_flight{0}, current_frame{0};
+  std::uint32_t max_frames_in_flight{0}, current_frame_index{0};
 
   // assets pointers
   // TriangleMesh *triangle_mesh;
@@ -119,10 +125,12 @@ private:
   std::unordered_map<PipelineType, vk::DescriptorSetLayout> mesh_set_layout;
   vk::DescriptorPool mesh_descriptor_pool;
   DescriptorSetLayoutData mesh_set_layout_bindings;
+  vk::DescriptorPool imgui_descriptor_pool;
 
   // command related variables
   vk::CommandPool command_pool;
   vk::CommandBuffer main_command_buffer;
+  vk::CommandPool imgui_command_pool;
 
   // pipeline-related variables
   std::vector<PipelineType> pipeline_types = {PipelineType::SKY,
@@ -130,6 +138,7 @@ private:
   std::unordered_map<PipelineType, vk::PipelineLayout> pipeline_layout;
   std::unordered_map<PipelineType, vk::RenderPass> renderpass;
   std::unordered_map<PipelineType, vk::Pipeline> pipeline;
+  vk::RenderPass imgui_renderpass;
 
   // device-related
   vk::SwapchainKHR swapchain{nullptr};

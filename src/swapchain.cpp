@@ -4,7 +4,6 @@
 #include "config.hpp"
 #include "images/ice_image.hpp"
 
-
 namespace ice {
 void SwapChainFrame::make_descriptor_resources() {
 
@@ -114,11 +113,16 @@ void SwapChainFrame::write_descriptor_set() {
   logical_device.updateDescriptorSets(write_ops, nullptr);
 }
 
-void SwapChainFrame::destroy() {
+void SwapChainFrame::destroy(vk::CommandPool imgui_command_pool) {
   // image resources
   logical_device.destroyImageView(image_view);
   logical_device.destroyFramebuffer(framebuffer[PipelineType::SKY]);
   logical_device.destroyFramebuffer(framebuffer[PipelineType::STANDARD]);
+
+  // imgui framebuffer
+  logical_device.destroyFramebuffer(imgui_framebuffer);
+  logical_device.freeCommandBuffers(imgui_command_pool, 1,
+                                    &imgui_command_buffer);
 
   // sync objects
   logical_device.destroyFence(in_flight_fence);
