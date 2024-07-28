@@ -52,6 +52,57 @@ inline vk::PipelineLayout make_pipeline_layout(
   }
 }
 
+inline vk::RenderPass make_imgui_renderpass(
+    const vk::Device &device, const vk::Format &swapchain_image_format,
+    const vk::Format &swapchain_depth_format,
+    vk::AttachmentLoadOp load_op = vk::AttachmentLoadOp::eLoad,
+    vk::ImageLayout initial_layout = vk::ImageLayout::eColorAttachmentOptimal) {
+#ifndef NDEBUG
+  std::cout << "Making ImGui Renderpass" << std::endl;
+#endif
+  vk::AttachmentDescription color_attachment = {
+      .format = swapchain_image_format,
+      .samples = vk::SampleCountFlagBits::e1,
+      .loadOp = load_op,
+      .storeOp = vk::AttachmentStoreOp::eStore,
+      .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
+      .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+      .initialLayout = initial_layout,
+      .finalLayout = vk::ImageLayout::ePresentSrcKHR};
+
+  vk::AttachmentReference colorAttachmentRef = {
+      .attachment = 0, .layout = vk::ImageLayout::eColorAttachmentOptimal};
+
+  vk::SubpassDescription subpass = {.pipelineBindPoint =
+                                        vk::PipelineBindPoint::eGraphics,
+                                    .colorAttachmentCount = 1,
+                                    .pColorAttachments = &colorAttachmentRef};
+
+  vk::SubpassDependency dependency = {
+      .srcSubpass = VK_SUBPASS_EXTERNAL,
+      .dstSubpass = 0,
+      .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+      .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+      .srcAccessMask = vk::AccessFlagBits::eNone,
+      .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
+  };
+
+  vk::RenderPassCreateInfo renderpass_info = {
+      .attachmentCount = 1,
+      .pAttachments = &color_attachment,
+      .subpassCount = 1,
+      .pSubpasses = &subpass,
+      .dependencyCount = 1,
+      .pDependencies = &dependency,
+  };
+
+  try {
+    return device.createRenderPass(renderpass_info);
+  } catch (vk::SystemError err) {
+    throw std::runtime_error("Failed to create ImGui renderpass!");
+  }
+}
+
 inline vk::RenderPass
 make_renderpass(const vk::Device &device,
                 const std::vector<vk::Format> &swapchain_image_format,
@@ -71,6 +122,8 @@ make_renderpass(const vk::Device &device,
   std::vector<vk::AttachmentReference> color_attachment_refs;
   color_attachment_refs.reserve(swapchain_image_format.size());
 
+  bool depth_present = swapchain_depth_format.has_value();
+
   std::uint32_t attachment_index{0};
   for (vk::Format color_image_format : swapchain_image_format) {
     vk::AttachmentDescription color_attachment = {
@@ -82,6 +135,10 @@ make_renderpass(const vk::Device &device,
         .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
         .initialLayout = initial_layout,
         .finalLayout = vk::ImageLayout::ePresentSrcKHR};
+
+    if (depth_present) { // Standard pipeline
+      color_attachment.finalLayout = vk::ImageLayout::eColorAttachmentOptimal;
+    }
 
     attachments.emplace_back(color_attachment);
 
@@ -95,7 +152,6 @@ make_renderpass(const vk::Device &device,
 
   // Depth Attachment
   vk::AttachmentReference depth_attachment_ref{};
-  bool depth_present = swapchain_depth_format.has_value();
   if (depth_present) {
     vk ::AttachmentDescription depth_attachment{
         .format = swapchain_depth_format.value(),
@@ -152,11 +208,6 @@ make_graphics_pipeline(const GraphicsPipelineInBundle &specification) {
 
   vk::PipelineVertexInputStateCreateInfo vertex_input_info{};
   if (vertex_attributes_present && vertex_bindings_present) {
-    /*   vk::VertexInputBindingDescription binding_description =
-          Vertex::get_binding_description();
-      std::vector<vk::VertexInputAttributeDescription> attribute_descriptions =
-          Vertex::get_attribute_descriptions(); */
-
     vertex_input_info = {
         .flags = vk::PipelineVertexInputStateCreateFlags(),
         .vertexBindingDescriptionCount = 1,
@@ -177,7 +228,6 @@ make_graphics_pipeline(const GraphicsPipelineInBundle &specification) {
   pipeline_info.pInputAssemblyState = &input_assembly_info;
 
 // Vertex Shader
-// will be appended to pipeline later
 #ifndef NDEBUG
   std::cout << "Vertex Shader creation" << std::endl;
 #endif
@@ -217,7 +267,6 @@ make_graphics_pipeline(const GraphicsPipelineInBundle &specification) {
   pipeline_info.pRasterizationState = &rasterizer_info;
 
 // fragment shader
-// append all shader stages
 #ifndef NDEBUG
   std::cout << "Fragment Shader creation" << std::endl;
 #endif
@@ -227,7 +276,7 @@ make_graphics_pipeline(const GraphicsPipelineInBundle &specification) {
       .stage = vk::ShaderStageFlagBits::eFragment,
       .module = fragment_shader,
       .pName = "main"};
-  // submit shaders
+  // submit all shader stages
   std::array<vk::PipelineShaderStageCreateInfo, 2> shader_stages = {
       vertex_shader_info, fragment_shader_info};
   pipeline_info.stageCount = static_cast<uint32_t>(shader_stages.size());

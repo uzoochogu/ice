@@ -64,6 +64,24 @@ inline void make_frame_command_buffers(const CommandBufferReq &buffer_req) {
   }
 }
 
+inline void make_imgui_command_buffers(const CommandBufferReq &buffer_req) {
+  vk::CommandBufferAllocateInfo alloc_info{
+      .commandPool = buffer_req.command_pool,
+      .level = vk::CommandBufferLevel::ePrimary,
+      .commandBufferCount = 1};
+
+  for (size_t i = 0; i < buffer_req.frames.size(); ++i) {
+    try {
+      buffer_req.frames[i].imgui_command_buffer =
+          buffer_req.device.allocateCommandBuffers(
+              alloc_info)[0]; // one per frame
+    } catch (vk::SystemError err) {
+      throw std::runtime_error(std::format(
+          "Failed to allocate imgui command buffer for frame {}", i));
+    }
+  }
+}
+
 // Begin recording a command buffer intended for a single submit.
 inline void start_job(vk::CommandBuffer command_buffer) {
 

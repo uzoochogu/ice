@@ -13,6 +13,7 @@ public:
   void calculate_frame_rate();
 
 private:
+  void apply_imgui_theme();
   double last_time, current_time;
   int num_frames;
   float frame_time;

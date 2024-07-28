@@ -1,5 +1,6 @@
 #include "camera.hpp"
 #include <GLFW/glfw3.h>
+#include <imgui.h>
 
 namespace ice {
 
@@ -24,6 +25,13 @@ void Camera::update_matrices(float FOV_deg, float near_plane, float far_plane) {
 
 void Camera::inputs(IceWindow *ice_window) {
   GLFWwindow *window = ice_window->get_window();
+  // Check if ImGui wants to capture the mouse
+  if (ImGui::GetIO().WantCaptureMouse) {
+    camera_active = false;
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    return;
+  }
+
   // Handles key inputs
   if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS) {
     // Resets to origin
@@ -73,16 +81,20 @@ void Camera::inputs(IceWindow *ice_window) {
     }
   }
 #endif
-  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS ||
+      glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS) {
     position += speed * orientation;
   }
-  if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+  if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS ||
+      glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
     position += speed * -glm::normalize(glm::cross(orientation, up));
   }
-  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS ||
+      glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS) {
     position += speed * -orientation;
   }
-  if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+  if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS ||
+      glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
     position += speed * glm::normalize(glm::cross(orientation, up));
   }
   if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
@@ -99,7 +111,10 @@ void Camera::inputs(IceWindow *ice_window) {
 
   // Handles mouse inputs
   if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+    if (!camera_active) {
+      camera_active = true;
+      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    }
 
     // Prevents camera from jumping on the first click
     if (first_click) {
@@ -108,8 +123,7 @@ void Camera::inputs(IceWindow *ice_window) {
       first_click = false;
     }
 
-    double mouse_x;
-    double mouse_y;
+    double mouse_x{0.0}, mouse_y{0.0};
     glfwGetCursorPos(window, &mouse_x, &mouse_y);
 
     // Normalizes and shifts the coordinates of the cursor such that they begin
@@ -132,8 +146,11 @@ void Camera::inputs(IceWindow *ice_window) {
                      static_cast<float>(height) / 2.0f);
   } else if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) ==
              GLFW_RELEASE) {
-    glfwSetInputMode(window, GLFW_CURSOR,
-                     GLFW_CURSOR_NORMAL); // not looking anymore
+    if (camera_active) {
+      camera_active = false;
+      glfwSetInputMode(window, GLFW_CURSOR,
+                       GLFW_CURSOR_NORMAL); // not looking anymore
+    }
     // Makes sure the next time the camera looks around it doesn't jump
     first_click = true;
   }

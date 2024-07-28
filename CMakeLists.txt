@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.8)
+cmake_minimum_required (VERSION 3.28)
 
 project (ice)
 
@@ -9,7 +9,7 @@ message(STATUS "Local .env.cmake:   ${LOCAL_ENV}")
 
 # windowing
 find_package(glfw3 CONFIG REQUIRED)
-# find_package(imgui CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
 
 # Vulkan and Utils
 find_package(Vulkan REQUIRED)
@@ -31,7 +31,7 @@ foreach( target IN ITEMS first_app)
   message(STATUS "Configuring target: ${target}")
   target_include_directories(${target} PRIVATE ${CMAKE_SOURCE_DIR}/src)
   target_link_libraries(${target} PRIVATE glfw)
-  # target_link_libraries(${target} PRIVATE imgui::imgui)
+  target_link_libraries(${target} PRIVATE imgui::imgui)
   target_include_directories(${target} PRIVATE ${STB_INCLUDE_DIRS} 
      ${TINYGLTF_INCLUDE_DIRS} ${Vulkan_INCLUDE_DIRS}
   )

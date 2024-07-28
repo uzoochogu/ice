@@ -12,6 +12,10 @@ VulkanIce::VulkanIce(IceWindow &window)
   create_surface(instance, window.get_window(), nullptr, &c_style_surface);
   surface = c_style_surface; // cast to C++ style
 
+  // ImGui context
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+
   make_device();
 
   setup_swapchain(nullptr);
@@ -59,6 +63,14 @@ VulkanIce::~VulkanIce() {
   }
 
   device.destroyDescriptorPool(mesh_descriptor_pool);
+
+  // imgui resource cleanup
+  device.destroyRenderPass(imgui_renderpass);
+  device.destroyCommandPool(imgui_command_pool);
+  ImGui_ImplVulkan_Shutdown();
+  ImGui_ImplGlfw_Shutdown();
+  device.destroyDescriptorPool(imgui_descriptor_pool);
+  ImGui::DestroyContext();
 
   delete meshes;
   delete gltf_mesh;
@@ -272,6 +284,44 @@ void VulkanIce::setup_descriptor_set_layouts() {
       make_descriptor_set_layout(device, mesh_set_layout_bindings);
 }
 
+namespace {
+// Utility Error Function used for ImGui code.
+static void check_vk_result(VkResult err) {
+  if (err == 0)
+    return;
+#ifndef NDEBUG
+  fprintf(stderr, "ImGui [vulkan] Error: VkResult = %d\n", err);
+#endif
+  if (err < 0)
+    abort();
+}
+} // namespace
+
+void VulkanIce::setup_imgui_overlay() {
+  // Platform/Renderer backends
+  ImGui_ImplGlfw_InitForVulkan(window.get_window(), true);
+  ImGui_ImplVulkan_InitInfo init_info = {};
+  init_info.Instance = instance;
+  init_info.PhysicalDevice = physical_device;
+  init_info.Device = device;
+  init_info.QueueFamily = indices.graphics_family.value();
+  init_info.Queue = graphics_queue;
+  init_info.PipelineCache = vk::PipelineCache{};
+  init_info.DescriptorPool = imgui_descriptor_pool;
+  init_info.RenderPass = imgui_renderpass;
+  init_info.Subpass = 0;
+  {
+    // Already sized to the minImageCount + 1 &&  < MaxImageCount
+    std::uint32_t image_count = static_cast<uint32_t>(swapchain_frames.size());
+    init_info.MinImageCount = image_count;
+    init_info.ImageCount = image_count;
+  }
+  init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+  init_info.Allocator = nullptr;
+  init_info.CheckVkResultFn = check_vk_result;
+  ImGui_ImplVulkan_Init(&init_info);
+}
+
 void VulkanIce::setup_pipeline_bundles() {
   // SKY PIPELINE
   // load and store op is don't care, will present.
@@ -309,15 +359,20 @@ void VulkanIce::setup_pipeline_bundles() {
   pipeline_layout[PipelineType::STANDARD] = std::move(graphics_bundle.layout);
   renderpass[PipelineType::STANDARD] = std::move(graphics_bundle.renderpass);
   pipeline[PipelineType::STANDARD] = std::move(graphics_bundle.pipeline);
+
+  // imgui renderpass
+  imgui_renderpass = make_imgui_renderpass(device, swapchain_format,
+                                           swapchain_frames[0].depth_format);
 }
 
 void VulkanIce::setup_framebuffers() {
   // Finalize setup
   FramebufferInput framebuffer_input{.device = device,
                                      .renderpass = renderpass,
+                                     .imgui_renderpass = imgui_renderpass,
                                      .swapchain_extent = swapchain_extent};
 
-  // populate frame buffers
+  // populate frame buffers (including imgui's), one for each swapchain image.
   make_framebuffers(framebuffer_input, swapchain_frames);
 }
 
@@ -330,6 +385,14 @@ void VulkanIce::setup_command_buffers() {
                                          .frames = swapchain_frames};
   main_command_buffer = make_command_buffer(command_buffer_req);
   make_frame_command_buffers(command_buffer_req);
+
+  // imgui command buffers
+  imgui_command_pool = make_command_pool(device, physical_device, surface);
+  command_buffer_req.command_pool = imgui_command_pool;
+
+  // frame imgui command buffers
+  command_buffer_req.command_pool = imgui_command_pool;
+  make_imgui_command_buffers(command_buffer_req);
 }
 
 // Sets up frame resources like sync objects, UBOs etc
@@ -401,6 +464,10 @@ void VulkanIce::recreate_swapchain() {
                                          .command_pool = command_pool,
                                          .frames = swapchain_frames};
   make_frame_command_buffers(command_buffer_req);
+
+  // recreate Imgui frame command buffers
+  command_buffer_req.command_pool = imgui_command_pool;
+  make_imgui_command_buffers(command_buffer_req);
 }
 
 void VulkanIce::make_worker_threads() {
@@ -571,6 +638,33 @@ void VulkanIce::make_assets() {
       // "resources/models/Suzanne.gltf", pre_transform);
       "resources/models/DamagedHelmet.gltf", pre_transform);
 
+  std::array<vk::DescriptorPoolSize, 11> imgui_pool_sizes = {
+      vk::DescriptorPoolSize{vk::DescriptorType::eSampler, 1000},
+      vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1000},
+      vk::DescriptorPoolSize{vk::DescriptorType::eSampledImage, 1000},
+      vk::DescriptorPoolSize{vk::DescriptorType::eStorageImage, 1000},
+      vk::DescriptorPoolSize{vk::DescriptorType::eUniformTexelBuffer, 1000},
+      vk::DescriptorPoolSize{vk::DescriptorType::eStorageTexelBuffer, 1000},
+      vk::DescriptorPoolSize{vk::DescriptorType::eUniformBuffer, 1000},
+      vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, 1000},
+      vk::DescriptorPoolSize{vk::DescriptorType::eUniformBufferDynamic, 1000},
+      vk::DescriptorPoolSize{vk::DescriptorType::eStorageBufferDynamic, 1000},
+      vk::DescriptorPoolSize{vk::DescriptorType::eInputAttachment, 1000}};
+
+  vk::DescriptorPoolCreateInfo imgui_pool_info{
+      .flags = vk::DescriptorPoolCreateFlags() |
+               vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+      .maxSets = 1,
+      .poolSizeCount = static_cast<uint32_t>(imgui_pool_sizes.size()),
+      .pPoolSizes = imgui_pool_sizes.data()};
+
+  try {
+    imgui_descriptor_pool = device.createDescriptorPool(imgui_pool_info);
+  } catch (vk::SystemError err) {
+#ifndef NDEBUG
+    std::cout << "Failed to make imgui descriptor pool\n";
+#endif
+  }
 #ifndef NDEBUG
   std::cout << "Finished making assets" << std::endl;
 #endif
@@ -633,14 +727,15 @@ void VulkanIce::prepare_scene(vk::CommandBuffer command_buffer) {
 
 // @brief Logic for rendering frames.
 void VulkanIce::render(Scene *scene) {
-  vk::Result result =
-      device.waitForFences(1, &swapchain_frames[current_frame].in_flight_fence,
-                           vk::True, UINT64_MAX);
-  // reset fence just before queue submit
-  result =
-      device.resetFences(1, &swapchain_frames[current_frame].in_flight_fence);
+  const ice::SwapChainFrame &current_frame =
+      swapchain_frames[current_frame_index]; // alias
 
-  std::uint32_t image_index;
+  vk::Result result = device.waitForFences(1, &current_frame.in_flight_fence,
+                                           vk::True, UINT64_MAX);
+  // reset fence just before queue submit
+  result = device.resetFences(1, &current_frame.in_flight_fence);
+
+  std::uint32_t acquired_image_index;
 
   // try-catch because exception would be throw by Vulkan-hpp once error is
   // detected.
@@ -648,9 +743,8 @@ void VulkanIce::render(Scene *scene) {
     // acquireNextImageKHR(vk::SwapChainKHR, timeout, semaphore_to_signal,
     // fence)
     vk::ResultValue acquire = device.acquireNextImageKHR(
-        swapchain, UINT64_MAX, swapchain_frames[current_frame].image_available,
-        nullptr);
-    image_index = acquire.value;
+        swapchain, UINT64_MAX, current_frame.image_available, nullptr);
+    acquired_image_index = acquire.value;
   } catch (vk::OutOfDateKHRError) {
 #ifndef NDEBUG
     std::cout << "Acquire error, Out of DateKHR\n";
@@ -659,13 +753,11 @@ void VulkanIce::render(Scene *scene) {
     return;
   }
 
-  vk::CommandBuffer command_buffer =
-      swapchain_frames[current_frame]
-          .command_buffer; // was swapchain_frames[image_index].command_buffer
+  vk::CommandBuffer command_buffer = current_frame.command_buffer;
 
   command_buffer.reset();
 
-  prepare_frame(image_index, scene);
+  prepare_frame(acquired_image_index, scene);
 
   // begin recording
   vk::CommandBufferBeginInfo begin_info = {};
@@ -676,8 +768,8 @@ void VulkanIce::render(Scene *scene) {
     throw std::runtime_error("Failed to begin recording command buffer!");
   }
   // record events
-  record_sky_draw_commands(command_buffer, image_index, scene);
-  record_scene_draw_commands(command_buffer, image_index, scene);
+  record_sky_draw_commands(command_buffer, acquired_image_index, scene);
+  record_scene_draw_commands(command_buffer, acquired_image_index, scene);
 
   // end
   try {
@@ -687,27 +779,60 @@ void VulkanIce::render(Scene *scene) {
     throw std::runtime_error("failed to record command buffer!");
   }
 
-  vk::SubmitInfo submit_info = {};
+  // Recording ImGui Command Buffers
+  {
+    begin_info = {.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
+    current_frame.imgui_command_buffer.begin(begin_info);
+    // Render pass
+    {
+      // clear values unions
+      vk::ClearValue clear_color =
+          vk::ClearColorValue({std::array<float, 4>{1.0f, 0.5f, 0.25f, 1.0f}});
 
-  vk::Semaphore wait_semaphores[] = {
-      swapchain_frames[current_frame].image_available};
+      vk::RenderPassBeginInfo info = {
+          .renderPass = imgui_renderpass,
+          .framebuffer =
+              swapchain_frames[acquired_image_index].imgui_framebuffer,
+          .renderArea = {.extent = {.width = swapchain_extent.width,
+                                    .height = swapchain_extent.height}},
+          .clearValueCount = 1,
+          .pClearValues = &clear_color,
+      };
+      current_frame.imgui_command_buffer.beginRenderPass(
+          info, vk::SubpassContents::eInline);
+    }
+
+    // ImGui Render command
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
+                                    current_frame.imgui_command_buffer);
+    // Submit command buffer
+    current_frame.imgui_command_buffer.endRenderPass();
+    current_frame.imgui_command_buffer.end();
+  }
+
+  // submit all command buffers
+  std::array<vk::CommandBuffer, 2> submit_command_buffers = {
+      command_buffer, current_frame.imgui_command_buffer};
+
+  // semaphores
+  vk::Semaphore wait_semaphores[] = {current_frame.image_available};
   vk::PipelineStageFlags wait_stages[] = {
       vk::PipelineStageFlagBits::eColorAttachmentOutput};
-  submit_info.waitSemaphoreCount = 1;
-  submit_info.pWaitSemaphores = wait_semaphores;
-  submit_info.pWaitDstStageMask = wait_stages;
+  vk::Semaphore signal_semaphores[] = {current_frame.render_finished};
 
-  submit_info.commandBufferCount = 1;
-  submit_info.pCommandBuffers = &command_buffer;
+  vk::SubmitInfo submit_info = {
+      .waitSemaphoreCount = 1,
+      .pWaitSemaphores = wait_semaphores,
+      .pWaitDstStageMask = wait_stages,
+      .commandBufferCount =
+          static_cast<uint32_t>(submit_command_buffers.size()),
+      .pCommandBuffers = submit_command_buffers.data(),
 
-  vk::Semaphore signal_semaphores[] = {
-      swapchain_frames[current_frame].render_finished};
-  submit_info.signalSemaphoreCount = 1;
-  submit_info.pSignalSemaphores = signal_semaphores;
+      .signalSemaphoreCount = 1,
+      .pSignalSemaphores = signal_semaphores};
 
   try {
-    graphics_queue.submit(submit_info,
-                          swapchain_frames[current_frame].in_flight_fence);
+    graphics_queue.submit(submit_info, current_frame.in_flight_fence);
   } catch (vk::SystemError err) {
 
     throw std::runtime_error("failed to submit draw command buffer!");
@@ -717,21 +842,17 @@ void VulkanIce::render(Scene *scene) {
   vk::PresentInfoKHR present_info = {
       .waitSemaphoreCount = 1,
       .pWaitSemaphores = signal_semaphores,
-
       .swapchainCount = 1,
       .pSwapchains = swapchains,
-
-      .pImageIndices = &image_index,
+      .pImageIndices = &acquired_image_index,
   };
 
-  // vk::Result present_result;
   try {
     result = present_queue.presentKHR(present_info);
   } catch (vk::OutOfDateKHRError) {
 #ifndef NDEBUG
     std::cout << "Present Error, Out of DateKHR/ Suboptimal KHR\n";
 #endif
-    // result = vk::Result::eErrorOutOfDateKHR;
     if (result == vk::Result::eErrorOutOfDateKHR ||
         result == vk::Result::eSuboptimalKHR) {
       recreate_swapchain();
@@ -740,7 +861,7 @@ void VulkanIce::render(Scene *scene) {
   }
 
   // increment current frame, loop around e.g  (0->1->0)
-  current_frame = (current_frame + 1) % max_frames_in_flight;
+  current_frame_index = (current_frame_index + 1) % max_frames_in_flight;
 }
 
 void VulkanIce::render_mesh(vk::CommandBuffer command_buffer,
@@ -1017,9 +1138,7 @@ void VulkanIce::pick_physical_device() {
 
       std::cout << std::format("Device Name: {}\n"
                                "Device Type: {}\n",
-                               /* Formatter not available??*/
-                               std::string(properties.deviceName.begin(),
-                                           properties.deviceName.end()),
+                               properties.deviceName.data(),
                                vk::to_string(properties.deviceType));
 #endif
       return;
@@ -1035,7 +1154,7 @@ void VulkanIce::pick_physical_device() {
 
 void VulkanIce::destroy_swapchain_bundle(bool include_swapchain) {
   for (auto frame : swapchain_frames) {
-    frame.destroy();
+    frame.destroy(imgui_command_pool);
   }
 
   if (include_swapchain) {

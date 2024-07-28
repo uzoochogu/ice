@@ -1,5 +1,5 @@
 {
-  "name": "imgui-vulkan-app",
+  "name": "ice",
   "version": "0.0.1",
   "builtin-baseline": "a1a1cbc975abf909a6c8985a6a2b8fe20bbd9bd6",
   "dependencies": [
@@ -14,6 +14,14 @@
     {
       "name": "stb",
       "version>=": "2023-04-11#1"
+    },
+    {
+      "name": "imgui",
+      "version>=": "1.90.7#1",
+      "features": [
+        "glfw-binding",
+        "vulkan-binding"
+      ]
     },
     "tinygltf"
   ]
