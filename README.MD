@@ -1,18 +1,18 @@
 # ice
-A Vulkan Renderer. Game Engine (WIP). 3D model viewport (WIP).
+A Vulkan Renderer and 3D Model viewport. Game Engine (WIP).
 
 ## Requirements
 * C++ compiler supporting at least C++20 standard.
-* Cmake 3.8+
+* Cmake 3.28+ (tested with this)
 
 ## Dependency management
-These are the project dependencies
-1. `imgui` with glfw and vulkan bindings. It is currently not used and is not included in the project but will provide immediate mode GUI capabilities when added.
-2. `glfw` - windowing (You should be able to plug in any windowing lib like SDL) - You just need to reimplement [`IceWindow`](./src/windowing.hpp) class using the library.
+These are the project dependencies:
+1. `imgui` with glfw and vulkan bindings. Provides immediate mode GUI capabilities.
+2. `glfw` - windowing (You should be able to plug in any windowing lib like SDL) - You just need to reimplement [`IceWindow`](./src/windowing.hpp) class using the library. You would also handle inputs in [`camera.cpp`](./src/camera.cpp)
 3. `glm` - linear algebra, good compatibility with GLSL.
-4. `stb` - loading images
-5. `tinyobjloader` - loading obj models
-6. `Vulkan-Hpp` - C++ Bindings for Vulkan API
+4. `stb` - loading images.
+5. `tinygltf` - loading glTF scenes and models.
+6. `Vulkan-Hpp` - C++ Bindings for Vulkan API. It is part of the LunarG Vulkan SDK since version 1.0.24 or part of Vulkan-Headers in `vcpkg`.
 
 You can follow this guide for setting up dependencies:
 
@@ -61,7 +61,7 @@ cd ./resources/shaders
 Do the following steps
 1. [`Install dependencies`](#dependency-management)
 2. [`Compile shaders`](#shaders-compilation)
-3. Generate and/or Building with CMake
+3. Generate and/or build with CMake
 
 `CMake` is used to generate project files.
 If you are working with vcpkg for dependency management, you can pass the toolchain file when you call cmake to generate:
