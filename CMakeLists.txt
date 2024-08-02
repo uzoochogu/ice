@@ -23,7 +23,10 @@ message(STATUS "tinygltf directory: ${STB_INCLUDE_DIRS}" )
 message(STATUS "Directory:          ${Vulkan_INCLUDE_DIRS}")
 message(STATUS "Directory:          ${Vulkan_LIBRARIES}")
 
-file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/src/*)
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS 
+     ${PROJECT_SOURCE_DIR}/src/* 
+     ${PROJECT_SOURCE_DIR}/third_party_patches/*
+    )
 
 add_executable (first_app ${SOURCES})
 
