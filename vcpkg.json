@@ -24,5 +24,11 @@
       ]
     },
     "tinygltf"
+  ],
+  "overrides": [
+    {
+      "name": "imgui",
+      "version": "1.90.7#1"
+    }
   ]
 }
