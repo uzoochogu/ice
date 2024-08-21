@@ -28,14 +28,15 @@ public:
   CameraMatrices get_camera_matrix() const;
   CameraVectors get_camera_vector() const;
 
-  void update_matrices(float FOV_deg, float near_plane, float far_plane);
+  void update_matrices(const float FOV_deg, const float near_plane,
+                       const float far_plane);
 
   // Handles keyboard and mouse inputs
   void inputs(IceWindow *ice_window);
 
   // window
-  void set_width(std::uint32_t width) { width = width; }
-  void set_height(std::uint32_t height) { height = height; };
+  void set_width(const std::uint32_t width) { this->width = width; }
+  void set_height(const std::uint32_t height) { this->height = height; };
 
 private:
   CameraMatrices camera_matrix;

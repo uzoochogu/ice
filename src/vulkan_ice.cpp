@@ -238,8 +238,8 @@ void VulkanIce::setup_swapchain(vk::SwapchainKHR *old_swapchain) {
       bundle.frames[0].extent; // at least one frame is guaranteed
 
   // update camera dims
-  camera.set_width(window.get_framebuffer_size().width);
-  camera.set_height(window.get_framebuffer_size().height);
+  camera.set_width(swapchain_extent.width);
+  camera.set_height(swapchain_extent.height);
 
   // set max frames
   max_frames_in_flight = static_cast<uint32_t>(swapchain_frames.size());
