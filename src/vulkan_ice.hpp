@@ -116,7 +116,7 @@ private:
   // Job System
   bool done = false;
   ice_threading::WorkQueue work_queue;
-  std::vector<std::thread> workers;
+  std::vector<std::jthread> workers;
 
   // descriptor-related variables
   std::unordered_map<PipelineType, vk::DescriptorSetLayout> frame_set_layout;

@@ -472,7 +472,7 @@ void VulkanIce::recreate_swapchain() {
 
 void VulkanIce::make_worker_threads() {
   done = false;
-  size_t thread_count = std::thread::hardware_concurrency() - 1;
+  size_t thread_count = std::jthread::hardware_concurrency() - 1;
 
   workers.reserve(thread_count);
   CommandBufferReq command_buffer_input = {device, command_pool,
@@ -480,7 +480,7 @@ void VulkanIce::make_worker_threads() {
   for (size_t i = 0; i < thread_count; ++i) {
     vk::CommandBuffer command_buffer =
         make_command_buffer(command_buffer_input);
-    workers.push_back(std::thread(ice_threading::WorkerThread(
+    workers.push_back(std::jthread(ice_threading::WorkerThread(
         work_queue, done, command_buffer, graphics_queue)));
   }
 }
@@ -533,6 +533,11 @@ void VulkanIce::make_assets() {
       .queue = graphics_queue,
       .layout = mesh_set_layout[PipelineType::STANDARD],
       .descriptor_pool = mesh_descriptor_pool};
+
+#ifndef NDEBUG
+  // Time to load OBJ Meshes
+  auto start = std::chrono::high_resolution_clock::now();
+#endif
 
   // Submit loading work
   work_queue.lock.lock();
@@ -593,6 +598,14 @@ void VulkanIce::make_assets() {
 
   meshes->finalize(finalization_info);
 
+#ifndef NDEBUG
+  auto end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed_seconds = end - start;
+  std::cout << std::format("Mesh loading took {} seconds",
+                           elapsed_seconds.count())
+            << std::endl;
+#endif
+
   // Sky Texture
   texture_info.layout = mesh_set_layout[PipelineType::SKY];
   texture_info.filenames = {{
@@ -628,6 +641,10 @@ void VulkanIce::make_assets() {
 
   pre_transform = glm::scale(pre_transform, glm::vec3(3.0f, 3.0f, 3.0f));
 
+#ifndef NDEBUG
+  // time to load GLTF mesh
+  start = std::chrono::high_resolution_clock::now();
+#endif
   // make GLTF MESH
   gltf_mesh = new GltfMesh(
       physical_device, device, main_command_buffer, graphics_queue,
@@ -637,6 +654,13 @@ void VulkanIce::make_assets() {
       // scale to see it
       // "resources/models/Suzanne.gltf", pre_transform);
       "resources/models/DamagedHelmet.gltf", pre_transform);
+
+#ifndef NDEBUG
+  end = std::chrono::high_resolution_clock::now();
+  elapsed_seconds = end - start;
+  std::cout << std::format("Time taken to load GLTF mesh: {}s\n",
+                           elapsed_seconds.count());
+#endif
 
   std::array<vk::DescriptorPoolSize, 11> imgui_pool_sizes = {
       vk::DescriptorPoolSize{vk::DescriptorType::eSampler, 1000},
