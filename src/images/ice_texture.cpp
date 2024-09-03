@@ -3,7 +3,6 @@
 #include "ice_texture.hpp"
 #include "../data_buffers.hpp"
 #include "../descriptors.hpp"
-#include "images/ice_image.hpp"
 
 namespace ice_image {
 
@@ -150,13 +149,14 @@ void Texture::populate() {
   memcpy(write_location, pixels, input.size);
   logical_device.unmapMemory(staging_buffer.buffer_memory);
 
-  // then transfer it to image memory
+  // transition layout
   ImageLayoutTransitionJob transition_job{
       .command_buffer = command_buffer,
       .queue = queue,
       .image = image,
       .old_layout = vk::ImageLayout::eUndefined,
-      .new_layout = vk::ImageLayout::eTransferDstOptimal,
+      .new_layout =
+          vk::ImageLayout::eTransferDstOptimal, /* Because it will Blitted on*/
       .mip_levels = mip_levels};
 
   transition_image_layout(transition_job);
