@@ -1,7 +1,5 @@
 #include "swapchain.hpp"
 
-#include "camera.hpp"
-#include "config.hpp"
 #include "images/ice_image.hpp"
 
 namespace ice {
@@ -70,14 +68,35 @@ void SwapChainFrame::make_depth_resources() {
       .tiling = vk::ImageTiling::eOptimal,
       .usage = vk::ImageUsageFlagBits::eDepthStencilAttachment,
       .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
-      .format = depth_format};
+      .format = depth_format,
+      .msaa_samples = msaa_samples};
 
   depth_buffer = ice_image::make_image(image_info);
   depth_buffer_memory = ice_image::make_image_memory(image_info, depth_buffer);
   depth_buffer_view =
-
       ice_image::make_image_view(logical_device, depth_buffer, depth_format,
                                  vk::ImageAspectFlagBits::eDepth);
+}
+
+void SwapChainFrame::make_color_resources() {
+  ice_image::ImageCreationInput image_info{
+      .logical_device = logical_device,
+      .physical_device = physical_device,
+      .width = extent.width,
+      .height = extent.height,
+      .tiling = vk::ImageTiling::eOptimal,
+      .usage = vk::ImageUsageFlagBits::eColorAttachment |
+               vk::ImageUsageFlagBits::eTransientAttachment,
+      .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
+      .format = color_format,
+      .mip_levels = 1,
+      .msaa_samples = msaa_samples};
+
+  color_buffer = ice_image::make_image(image_info);
+  color_buffer_memory = ice_image::make_image_memory(image_info, color_buffer);
+  color_buffer_view =
+      ice_image::make_image_view(logical_device, color_buffer, color_format,
+                                 vk::ImageAspectFlagBits::eColor);
 }
 
 void SwapChainFrame::record_write_operations() {
@@ -146,6 +165,11 @@ void SwapChainFrame::destroy(vk::CommandPool imgui_command_pool) {
   logical_device.destroyImage(depth_buffer);
   logical_device.freeMemory(depth_buffer_memory);
   logical_device.destroyImageView(depth_buffer_view);
+
+  // color resources
+  logical_device.destroyImage(color_buffer);
+  logical_device.freeMemory(color_buffer_memory);
+  logical_device.destroyImageView(color_buffer_view);
 }
 
 } // namespace ice

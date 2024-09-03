@@ -95,8 +95,10 @@ private:
   // utility functions
   bool is_validation_supported();
   void pick_physical_device();
-  bool check_device_extension_support(const vk::PhysicalDevice &device);
-  bool is_device_suitable(const vk::PhysicalDevice &device);
+  bool
+  check_device_extension_support(const vk::PhysicalDevice &physical_device);
+  bool is_device_suitable(const vk::PhysicalDevice &physical_device);
+  vk::SampleCountFlagBits get_max_sample_count(); // for MSAA support
 
   // useful data
   QueueFamilyIndices indices;
@@ -145,6 +147,7 @@ private:
   std::vector<SwapChainFrame> swapchain_frames;
   vk::Format swapchain_format;
   vk::Extent2D swapchain_extent;
+  vk::SampleCountFlagBits msaa_samples{vk::SampleCountFlagBits::e1};
   vk::Queue graphics_queue{nullptr}, present_queue{nullptr};
   vk::PhysicalDevice physical_device{nullptr};
   vk::Device device{nullptr};

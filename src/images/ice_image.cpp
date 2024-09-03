@@ -18,7 +18,7 @@ vk::Image make_image(const ImageCreationInput &input) {
       .mipLevels = input.mip_levels,
       .arrayLayers = input.array_count,
 
-      .samples = vk::SampleCountFlagBits::e1,
+      .samples = input.msaa_samples,
       .tiling = input.tiling,
       .usage = input.usage,
 
