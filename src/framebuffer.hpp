@@ -22,10 +22,9 @@ struct FramebufferInput {
 inline void make_framebuffers(const FramebufferInput &input_bundle,
                               std::vector<SwapChainFrame> &out_frames) {
   for (int i = 0; i < out_frames.size(); ++i) {
-    std::vector<vk::ImageView> attachments = {
-        out_frames[i].image_view,
-    };
+    std::vector<vk::ImageView> attachments = {out_frames[i].color_buffer_view};
 
+    // Sky Pipeline
     vk::FramebufferCreateInfo framebuffer_info{
         .renderPass = input_bundle.renderpass.at(PipelineType::SKY),
         .attachmentCount = static_cast<std::uint32_t>(attachments.size()),
@@ -43,7 +42,9 @@ inline void make_framebuffers(const FramebufferInput &input_bundle,
                 << std::endl;
     }
 
-    attachments.push_back(out_frames[i].depth_buffer_view);
+    // Standard Pipeline
+    attachments = {out_frames[i].color_buffer_view,
+                   out_frames[i].depth_buffer_view, out_frames[i].image_view};
     framebuffer_info.renderPass =
         input_bundle.renderpass.at(PipelineType::STANDARD);
     framebuffer_info.attachmentCount =

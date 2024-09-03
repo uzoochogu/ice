@@ -13,10 +13,7 @@ namespace ice {
 // @brief Bundles everything related to a swapchain frame: image, image view,
 // frame buffer, command buffer, per-frame descriptors like UBO and model
 // transforms and synchronization objects
-class SwapChainFrame {
-
-public:
-  // For doing work
+struct SwapChainFrame {
   vk::PhysicalDevice physical_device;
   vk::Device logical_device;
 
@@ -25,10 +22,19 @@ public:
   vk::ImageView image_view;
   std::unordered_map<PipelineType, vk::Framebuffer> framebuffer;
   vk::Framebuffer imgui_framebuffer;
+
+  // depth resources
   vk::Image depth_buffer;
   vk::DeviceMemory depth_buffer_memory;
   vk::ImageView depth_buffer_view;
   vk::Format depth_format;
+
+  // color resources
+  vk::SampleCountFlagBits msaa_samples;
+  vk::Image color_buffer;
+  vk::DeviceMemory color_buffer_memory;
+  vk::ImageView color_buffer_view;
+
   vk::Extent2D extent;
 
   vk::CommandBuffer command_buffer;
@@ -42,6 +48,8 @@ public:
   CameraMatrices camera_matrix_data;
   BufferBundle camera_matrix_buffer;
   void *camera_matrix_write_location;
+
+  vk::Format color_format;
 
   CameraVectors camera_vector_data;
   BufferBundle camera_vector_buffer;
@@ -64,6 +72,8 @@ public:
 
   void make_depth_resources();
 
+  void make_color_resources();
+
   void record_write_operations();
 
   void write_descriptor_set();
@@ -71,7 +81,7 @@ public:
   void destroy(vk::CommandPool imgui_command_pool);
 };
 
-// @brief Bundles handles that would be created  with swapchain:
+// Bundles handles that would be created  with swapchain:
 // swapchain, SwapchainFrame struct , format and extents.
 struct SwapChainBundle {
   vk::SwapchainKHR swapchain;
@@ -79,7 +89,7 @@ struct SwapChainBundle {
   vk::Format format;
 };
 
-// @brief stores swapchain support details: capabilities, formats and
+// Stores swapchain support details: capabilities, formats and
 // present modes
 struct SwapChainSupportDetails {
   vk::SurfaceCapabilitiesKHR capabilities;
@@ -154,11 +164,11 @@ choose_swap_present_mode(const std::vector<vk::PresentModeKHR> &present_modes) {
   return vk::PresentModeKHR::eFifo;
 }
 
-inline SwapChainBundle
-create_swapchain_bundle(vk::PhysicalDevice physical_device,
-                        vk::Device logical_device, vk::SurfaceKHR surface,
-                        int width, int height,
-                        vk::SwapchainKHR *old_swapchain = nullptr) {
+inline SwapChainBundle create_swapchain_bundle(
+    vk::PhysicalDevice physical_device, vk::Device logical_device,
+    vk::SurfaceKHR surface, int width, int height,
+    vk::SwapchainKHR *old_swapchain = nullptr,
+    vk::SampleCountFlagBits msaa_samples = vk::SampleCountFlagBits::e1) {
 
   // Get Swapchain support info
   SwapChainSupportDetails swapchain_support =
@@ -229,8 +239,12 @@ create_swapchain_bundle(vk::PhysicalDevice physical_device,
         logical_device, images[i], surface_format.format,
         vk::ImageAspectFlagBits::eColor);
 
-    // make frame depth resources
+    bundle.frames[i].color_format = surface_format.format;
+
+    bundle.frames[i].msaa_samples = msaa_samples;
+
     bundle.frames[i].make_depth_resources();
+    bundle.frames[i].make_color_resources();
   }
 
   bundle.format = surface_format.format;

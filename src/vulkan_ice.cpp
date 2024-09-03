@@ -18,6 +18,11 @@ VulkanIce::VulkanIce(IceWindow &window)
 
   make_device();
 
+#ifndef NDEBUG
+  std::cout << "Finished creating VkDevice\n";
+#endif
+
+  // swapchain, format, extent, msaa_samples
   setup_swapchain(nullptr);
 
   setup_descriptor_set_layouts();
@@ -159,7 +164,7 @@ void VulkanIce::make_instance() {
 #endif
 }
 
-// Physical Device
+// picks physical device, makes logical device, gets and pairs queues
 void VulkanIce::make_device() {
   pick_physical_device();
 
@@ -191,7 +196,9 @@ void VulkanIce::make_device() {
   }
 
   // Pick device features you want
-  vk::PhysicalDeviceFeatures device_features{};
+  // sample rate shading can boost frame rate when multisampling is enabled
+  vk::PhysicalDeviceFeatures device_features{.sampleRateShading = vk::True,
+                                             .samplerAnisotropy = vk::True};
 
   // Create device
   vk::DeviceCreateInfo device_info{
@@ -227,10 +234,19 @@ void VulkanIce::make_device() {
 }
 
 void VulkanIce::setup_swapchain(vk::SwapchainKHR *old_swapchain) {
+  msaa_samples =
+      std::min(get_max_sample_count(),
+               vk::SampleCountFlagBits::e8); // capped at 8 BIT for now
+#ifndef NDEBUG
+  std::cout << std::format("Max MSAA samples: {}\nChosen MSAA samples: {}",
+                           vk::to_string(get_max_sample_count()),
+                           vk::to_string(msaa_samples))
+            << std::endl;
+#endif
   // swapchain creation
   SwapChainBundle bundle = create_swapchain_bundle(
       physical_device, device, surface, window.get_framebuffer_size().width,
-      window.get_framebuffer_size().height, old_swapchain);
+      window.get_framebuffer_size().height, old_swapchain, msaa_samples);
   swapchain = bundle.swapchain;
   swapchain_frames = bundle.frames;
   swapchain_format = bundle.format;
@@ -330,11 +346,12 @@ void VulkanIce::setup_pipeline_bundles() {
       .vertex_filepath = "resources/shaders/sky_vert.spv",
       .fragment_filepath = "resources/shaders/sky_frag.spv",
       .swapchain_extent = swapchain_extent,
-      .swapchain_image_format = {swapchain_format},
+      .swapchain_image_format = swapchain_format,
       .descriptor_set_layouts = {frame_set_layout[PipelineType::SKY],
                                  mesh_set_layout[PipelineType::SKY]},
       .load_op = vk::AttachmentLoadOp::eDontCare,
-      .initial_layout = vk::ImageLayout::eUndefined};
+      .initial_layout = vk::ImageLayout::eUndefined,
+      .msaa_samples = msaa_samples};
 
   GraphicsPipelineOutBundle graphics_bundle = make_graphics_pipeline(spec);
 
@@ -347,12 +364,13 @@ void VulkanIce::setup_pipeline_bundles() {
   spec.fragment_filepath = "resources/shaders/frag.spv";
   spec.attribute_descriptions = Vertex::get_attribute_descriptions();
   spec.binding_description = Vertex::get_binding_description();
-  spec.swapchain_depth_format = {
-      swapchain_frames[0].depth_format} /* at least 1 is guaranteed*/;
+  spec.swapchain_depth_format =
+      swapchain_frames[0].depth_format /* at least 1 is guaranteed*/;
   spec.descriptor_set_layouts = {frame_set_layout[PipelineType::STANDARD],
                                  mesh_set_layout[PipelineType::STANDARD]};
   spec.load_op = vk::AttachmentLoadOp::eLoad;
-  spec.initial_layout = vk::ImageLayout::ePresentSrcKHR;
+  spec.initial_layout = vk::ImageLayout::eColorAttachmentOptimal;
+  spec.msaa_samples = msaa_samples;
 
   graphics_bundle = make_graphics_pipeline(spec);
 
@@ -902,13 +920,6 @@ void VulkanIce::render_mesh(vk::CommandBuffer command_buffer,
 
 void VulkanIce::record_sky_draw_commands(vk::CommandBuffer command_buffer,
                                          uint32_t image_index, Scene *scene) {
-  // clear values unions
-  vk::ClearValue clear_color =
-      vk::ClearColorValue({std::array<float, 4>{1.0f, 0.5f, 0.25f, 1.0f}});
-  vk::ClearValue clear_depth = vk::ClearDepthStencilValue({1.0f, 0});
-
-  std::vector<vk::ClearValue> clear_values = {{clear_color, clear_depth}};
-
   vk::RenderPassBeginInfo renderpass_info = {
       .renderPass = renderpass[PipelineType::SKY],
       .framebuffer =
@@ -916,11 +927,7 @@ void VulkanIce::record_sky_draw_commands(vk::CommandBuffer command_buffer,
       .renderArea{
           .offset{.x = 0, .y = 0},
           .extent = swapchain_extent,
-      },
-
-      .clearValueCount = static_cast<std::uint32_t>(clear_values.size()),
-      .pClearValues = clear_values.data(),
-  };
+      }};
 
   command_buffer.beginRenderPass(&renderpass_info,
                                  vk::SubpassContents::eInline);
@@ -1104,10 +1111,10 @@ bool VulkanIce::is_validation_supported() {
 }
 
 bool VulkanIce::check_device_extension_support(
-    const vk::PhysicalDevice &device) {
+    const vk::PhysicalDevice &physical_device) {
 
   std::vector<vk::ExtensionProperties> available_extensions =
-      device.enumerateDeviceExtensionProperties();
+      physical_device.enumerateDeviceExtensionProperties();
 
   // Copy required extensions defined globally
   std::set<std::string> required_extensions(device_extensions.begin(),
@@ -1120,32 +1127,38 @@ bool VulkanIce::check_device_extension_support(
 }
 
 // internal utility functions
-bool VulkanIce::is_device_suitable(const vk::PhysicalDevice &device) {
-  QueueFamilyIndices indices = find_queue_families(device, surface);
-  bool extensions_supported = check_device_extension_support(device);
+bool VulkanIce::is_device_suitable(const vk::PhysicalDevice &physical_device) {
+  QueueFamilyIndices indices = find_queue_families(physical_device, surface);
+  bool extensions_supported = check_device_extension_support(physical_device);
 
-  // TODO query for swapchain support  if extensions supported
-
-  if (!extensions_supported) {
-    return false;
+  bool swapchain_adequate = false;
+  // only query for swapchain support after verifying the extension is
+  // available
+  if (extensions_supported) {
+    SwapChainSupportDetails swapchain_support =
+        query_swapchain_support(physical_device, surface);
+    swapchain_adequate = !swapchain_support.formats.empty() &&
+                         !swapchain_support.present_modes.empty();
   }
 
-  // TODO return true if indices.isComplete() && extensions_supported &&
-  // swapChainAdequate &&
-  // supportedFeatures.samplerAnisotropy
+  vk::PhysicalDeviceFeatures supported_features = physical_device.getFeatures();
 
 #ifndef NDEBUG
   std::cout << std::format("The value of indices: {}\n",
-                           indices.graphics_family.has_value());
+                           indices.graphics_family.has_value())
+            << std::endl;
 #endif
-  // return indices.graphics_family.has_value();
-  return indices.is_complete();
+  return indices.is_complete() && extensions_supported && swapchain_adequate &&
+         supported_features.samplerAnisotropy &&
+         supported_features.sampleRateShading;
 }
 
-// \todo declare callable argument for picking strategy
-// \brief Picks a physical device using a strategy - default strategy is the
-// first suitable device.
-// \exception It throws a runtime error if it fails to pick a physical device.
+/**
+ * @todo  declare callable argument for picking strategy
+ * Picks a physical device using a strategy - default strategy is the
+ * first suitable device.
+ * @exception It throws a runtime error if it fails to pick a physical device.
+ */
 void VulkanIce::pick_physical_device() {
   std::vector<vk::PhysicalDevice> available_devices =
       instance.enumeratePhysicalDevices();
@@ -1163,7 +1176,8 @@ void VulkanIce::pick_physical_device() {
       std::cout << std::format("Device Name: {}\n"
                                "Device Type: {}\n",
                                properties.deviceName.data(),
-                               vk::to_string(properties.deviceType));
+                               vk::to_string(properties.deviceType))
+                << std::endl;
 #endif
       return;
     }
@@ -1174,6 +1188,37 @@ void VulkanIce::pick_physical_device() {
 #endif
 
   throw std::runtime_error("failed to pick a physical device!");
+}
+
+vk::SampleCountFlagBits VulkanIce::get_max_sample_count() {
+  // maximum number of samples
+  vk::PhysicalDeviceProperties physical_device_properties =
+      physical_device.getProperties();
+
+  // The highest supported by both depth and color buffers.
+  vk::SampleCountFlags counts =
+      physical_device_properties.limits.framebufferColorSampleCounts &
+      physical_device_properties.limits.framebufferDepthSampleCounts;
+  if (counts & vk::SampleCountFlagBits::e64) {
+    return vk::SampleCountFlagBits::e64;
+  }
+  if (counts & vk::SampleCountFlagBits::e32) {
+    return vk::SampleCountFlagBits::e32;
+  }
+  if (counts & vk::SampleCountFlagBits::e16) {
+    return vk::SampleCountFlagBits::e16;
+  }
+  if (counts & vk::SampleCountFlagBits::e8) {
+    return vk::SampleCountFlagBits::e8;
+  }
+  if (counts & vk::SampleCountFlagBits::e4) {
+    return vk::SampleCountFlagBits::e4;
+  }
+  if (counts & vk::SampleCountFlagBits::e2) {
+    return vk::SampleCountFlagBits::e2;
+  }
+
+  return vk::SampleCountFlagBits::e1;
 }
 
 void VulkanIce::destroy_swapchain_bundle(bool include_swapchain) {

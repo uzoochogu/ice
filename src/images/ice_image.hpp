@@ -29,6 +29,7 @@ struct ImageCreationInput {
   std::uint32_t array_count{1};
   vk::ImageCreateFlags create_flags;
   std::uint32_t mip_levels{1};
+  vk::SampleCountFlagBits msaa_samples{vk::SampleCountFlagBits::e1};
 };
 
 // input needed for image layout transitions jobs
