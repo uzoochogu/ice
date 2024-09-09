@@ -14,7 +14,9 @@ inline std::vector<char> read_file(const std::string &filename) {
                          std::ios::binary); // start reading at the end of file.
 
   if (!file.is_open()) {
+#ifndef NDEBUG
     std::cerr << "Failed to open file" << std::endl;
+#endif
     throw std::runtime_error("failed to open file!");
   }
 

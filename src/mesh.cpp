@@ -396,9 +396,11 @@ void GltfMesh::bind_mesh(tinygltf::Mesh &mesh,
           indices.push_back(index_data_int[i]);
         }
       } else {
+#ifndef NDEBUG
         std::cerr
             << "Warning: Unsupported index component type. Skipping indices."
             << std::endl;
+#endif
       }
     } else {
       // If no indices are provided, create a simple index buffer

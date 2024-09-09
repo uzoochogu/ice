@@ -222,8 +222,10 @@ inline SwapChainBundle create_swapchain_bundle(
   try {
     bundle.swapchain = logical_device.createSwapchainKHR(swap_info);
   } catch (const vk::SystemError &e) {
-    throw std::runtime_error("failed to create swapchain");
+#ifndef NDEBUG
     std::cerr << e.what() << '\n';
+#endif
+    throw std::runtime_error("failed to create swapchain");
   }
 
   std::vector<vk::Image> images =

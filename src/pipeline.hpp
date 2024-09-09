@@ -429,7 +429,10 @@ make_graphics_pipeline(const GraphicsPipelineInBundle &specification) {
   vk::Pipeline graphics_pipeline =
       specification.device.createGraphicsPipeline(nullptr, pipeline_info).value;
   if (graphics_pipeline == nullptr) {
+#ifndef NDEBUG
     std::cerr << "Failed to create Pipeline" << std::endl;
+#endif
+    throw std::runtime_error("Failed to create Pipeline");
   }
 
   GraphicsPipelineOutBundle output{.layout = pipeline_layout,
