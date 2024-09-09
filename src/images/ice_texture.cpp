@@ -175,7 +175,7 @@ void Texture::populate() {
   ice_image::generate_mipmaps(physical_device, command_buffer, image, queue,
                               vk::Format::eR8G8B8A8Srgb, width, height,
                               mip_levels);
-#ifndef NDEBGUG
+#ifndef NDEBUG
   std::cout << "Finished generating mipmaps\n";
 #endif
 

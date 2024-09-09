@@ -84,6 +84,7 @@ inline bool load_gltf_model(tinygltf::Model &model, const char *filename) {
                                     filename); // for binary glTF(.glb)
   }
 
+#ifndef NDEBUG
   if (!warn.empty()) {
     std::cout << "WARN: " << warn << std::endl;
   }
@@ -97,6 +98,7 @@ inline bool load_gltf_model(tinygltf::Model &model, const char *filename) {
   } else {
     std::cout << "Loaded glTF: " << filename << std::endl;
   }
+#endif
 
   return res;
 }
