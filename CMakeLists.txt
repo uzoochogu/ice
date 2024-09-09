@@ -53,7 +53,9 @@ if(MSVC)
 
   # Needed in Visual Studio to enable file access to non-local paths
   # TargetDir is a VS macro containing path to executable directory 
-  set_target_properties(${vulkan_apps} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$(TargetDir)/" )
+  set_target_properties(
+    ${vulkan_apps} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:${vulkan_apps}>/" 
+  )
 
   # Copy compiled shaders to executable directory
   # Add post-build commands
