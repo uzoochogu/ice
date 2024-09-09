@@ -152,7 +152,7 @@ create_device_local_buffer(vk::PhysicalDevice physical_device,
                                   buffer_input.size, queue, command_buffer);
   if (result != vk::Result::eSuccess) {
 #ifndef NDEBUG
-    std::cout << std::format("{} copy operation  creation failed!\n",
+    std::cerr << std::format("{} copy operation creation failed!\n",
                              vk::to_string(usage_bit));
 #endif
   }

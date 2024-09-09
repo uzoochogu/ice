@@ -53,7 +53,7 @@ make_descriptor_set_layout(vk::Device device,
     return device.createDescriptorSetLayout(layout_info);
   } catch (vk::SystemError err) {
 #ifndef NDEBUG
-    std::cout << "Failed to create Descriptor Set Layout\n";
+    std::cerr << "Failed to create Descriptor Set Layout\n";
 #endif
     return nullptr;
   }
@@ -92,7 +92,7 @@ make_descriptor_pool(vk::Device device, uint32_t size,
   } catch (vk::SystemError err) {
 
 #ifndef NDEBUG
-    std::cout << "Failed to make descriptor pool\n";
+    std::cerr << "Failed to make descriptor pool\n";
 #endif
 
     return nullptr;
@@ -121,7 +121,7 @@ allocate_descriptor_sets(vk::Device device, vk::DescriptorPool descriptor_pool,
     return device.allocateDescriptorSets(allocation_info)[0];
   } catch (vk::SystemError err) {
 #ifndef NDEBUG
-    std::cout << "Failed to allocate descriptor set from pool\n";
+    std::cerr << "Failed to allocate descriptor set from pool\n";
 #endif
     return nullptr;
   }

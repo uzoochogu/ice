@@ -113,9 +113,11 @@ void Texture::load() {
 #endif
   pixels = stbi_load(filename, &width, &height, &channels, STBI_rgb_alpha);
   if (pixels == nullptr) {
+#ifndef NDEBUG
     std::cout << std::format("Unable to load: {}, reason: {}", filename,
                              stbi_failure_reason())
               << std::endl;
+#endif
     width = height = 10;
     channels = 4;
 #ifndef NDEBUG

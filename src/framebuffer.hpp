@@ -37,9 +37,13 @@ inline void make_framebuffers(const FramebufferInput &input_bundle,
         input_bundle.device.createFramebuffer(framebuffer_info);
 
     if (out_frames[i].framebuffer[PipelineType::SKY] == nullptr) {
-      std::cout << std::format("Failed to create Sky framebuffer for frame {}",
+#ifndef NDEBUG
+      std::cerr << std::format("Failed to create Sky framebuffer for frame {}",
                                i)
                 << std::endl;
+#endif
+      throw std::runtime_error(
+          std::format("Failed to create Sky framebuffer for frame {}", i));
     }
 
     // Standard Pipeline
@@ -55,9 +59,13 @@ inline void make_framebuffers(const FramebufferInput &input_bundle,
         input_bundle.device.createFramebuffer(framebuffer_info);
 
     if (out_frames[i].framebuffer[PipelineType::STANDARD] == nullptr) {
-      std::cout << std::format(
+#ifndef NDEBUG
+      std::cerr << std::format(
                        "Failed to create standard framebuffer for frame {}", i)
                 << std::endl;
+#endif
+      throw std::runtime_error(
+          std::format("Failed to create standard framebuffer for frame {}", i));
     }
 
     // imgui framebuffer
@@ -70,9 +78,13 @@ inline void make_framebuffers(const FramebufferInput &input_bundle,
         input_bundle.device.createFramebuffer(framebuffer_info);
 
     if (out_frames[i].imgui_framebuffer == nullptr) {
-      std::cout << std::format(
+#ifndef NDEBUG
+      std::cerr << std::format(
                        "Failed to create ImGui framebuffer for frame {}", i)
                 << std::endl;
+#endif
+      throw std::runtime_error(
+          std::format("Failed to create ImGui framebuffer for frame {}", i));
     }
   }
 }

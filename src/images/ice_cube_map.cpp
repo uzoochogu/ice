@@ -184,7 +184,9 @@ void CubeMap::make_sampler() {
   try {
     sampler = logical_device.createSampler(sampler_info);
   } catch (vk::SystemError err) {
+#ifndef NDEBUG
     std::cout << "Failed to make sampler for Cube Map." << std::endl;
+#endif
   }
 #ifndef NDEBUG
   std::cout << "Finished Creating the sampler for Cube Map\n\n" << std::endl;
