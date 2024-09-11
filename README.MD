@@ -1,6 +1,9 @@
 # ice
 A Vulkan Renderer and 3D Model viewport. Game Engine (WIP).
 
+## Demo
+![ice engine demo](https://github.com/uzoochogu/media/blob/main/ice/ice%20engine%20demo.gif)
+
 ## Requirements
 * C++ compiler supporting at least C++20 standard.
 * Cmake 3.28+ (tested with this)
