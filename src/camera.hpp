@@ -21,24 +21,28 @@ struct CameraVectors {
   glm::vec4 up;
 };
 
+struct CameraDimensions {
+  std::uint32_t width{800};
+  std::uint32_t height{600};
+};
+
 class Camera {
-public:
-  Camera(int width, int height, glm::vec3 position);
+ public:
+  Camera(CameraDimensions dim, glm::vec3 position);
 
-  CameraMatrices get_camera_matrix() const;
-  CameraVectors get_camera_vector() const;
+  [[nodiscard]] CameraMatrices get_camera_matrix() const;
+  [[nodiscard]] CameraVectors get_camera_vector() const;
 
-  void update_matrices(const float FOV_deg, const float near_plane,
-                       const float far_plane);
+  void update_matrices(float FOV_deg, float near_plane, float far_plane);
 
   // Handles keyboard and mouse inputs
   void inputs(IceWindow *ice_window);
 
   // window
-  void set_width(const std::uint32_t width) { this->width = width; }
-  void set_height(const std::uint32_t height) { this->height = height; };
+  void set_width(const std::uint32_t new_width) { width = new_width; }
+  void set_height(const std::uint32_t new_height) { height = new_height; }
 
-private:
+ private:
   CameraMatrices camera_matrix;
   CameraVectors camera_vector{glm::vec4({1.0f, 0.0f, 0.0f, 0.0f}),
                               glm::vec4({0.0f, -1.0f, 0.0f, 0.0f}),
@@ -60,5 +64,6 @@ private:
   float default_speed{0.005f}, speed = {0.005f}, sensitivity{5.0f};
 };
 
-} // namespace ice
-#endif
+}  // namespace ice
+
+#endif  // CAMERA_HPP

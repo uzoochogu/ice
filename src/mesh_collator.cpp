@@ -5,12 +5,12 @@ namespace ice {
 #ifndef NDEBUG
 std::string to_string(MeshTypes type) {
   switch (type) {
-  case MeshTypes::GROUND:
-    return "Ground";
-  case MeshTypes::GIRL:
-    return "Girl";
-  case MeshTypes::SKULL:
-    return "Skull";
+    case MeshTypes::GROUND:
+      return "Ground";
+    case MeshTypes::GIRL:
+      return "Girl";
+    case MeshTypes::SKULL:
+      return "Skull";
   }
   return "Invalid type";
 }
@@ -22,7 +22,7 @@ void MeshCollator::consume(MeshTypes type,
   vertex_lump.reserve(vertex_data.size());
   index_lump.reserve(index_data.size());
 
-  std::uint32_t vertex_count = static_cast<std::uint32_t>(vertex_data.size());
+  auto vertex_count = static_cast<std::uint32_t>(vertex_data.size());
 
   index_lump_offsets.insert(
       std::make_pair(type, static_cast<int>(index_lump.size())));
@@ -30,16 +30,17 @@ void MeshCollator::consume(MeshTypes type,
       std::make_pair(type, static_cast<int>(index_data.size())));
 
 #ifndef NDEBUG
-  std::cout << std::format("\nMesh Type:        {:<8}, Vertex Count:  {}"
-                           "\nTotal Attributes: {:<8}, Index count :  {}\n\n",
-                           ice::to_string(type), vertex_count, vertex_count * 8,
-                           static_cast<int>(index_data.size()));
+  std::cout << std::format(
+      "\nMesh Type:        {:<8}, Vertex Count:  {}"
+      "\nTotal Attributes: {:<8}, Index count :  {}\n\n",
+      ice::to_string(type), vertex_count, vertex_count * 8,
+      static_cast<int>(index_data.size()));
 #endif
 
   for (const Vertex &attribute : vertex_data) {
     vertex_lump.push_back(attribute);
   }
-  for (std::uint32_t index : index_data) {
+  for (const std::uint32_t index : index_data) {
     index_lump.push_back(index_offset + index);
   }
 
@@ -70,4 +71,4 @@ MeshCollator::~MeshCollator() {
   logical_device.destroyBuffer(index_buffer.buffer);
   logical_device.freeMemory(index_buffer.buffer_memory);
 }
-} // namespace ice
+}  // namespace ice

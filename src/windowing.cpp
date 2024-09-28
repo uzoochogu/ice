@@ -2,7 +2,6 @@
 
 namespace ice {
 IceWindow::IceWindow(int width, int height, std::string name) {
-
   glfwInit();
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -21,15 +20,15 @@ IceWindow::~IceWindow() {
 
 // Returns the required list of extension based on whether validation layers
 // are enabled or not,
-std::vector<const char *> IceWindow::get_required_extensions() const {
-  std::uint32_t glfwExtensionCount = 0;
-  const char **glfwExtensions;
-  glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+std::vector<const char *> IceWindow::get_required_extensions() {
+  std::uint32_t glfw_extension_count = 0;
+  const char **glfw_extensions;
+  glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
 
   std::vector<const char *> extensions(
-      glfwExtensions,
-      glfwExtensions +
-          glfwExtensionCount); // std::vector<T>(InputIt first, InputIt last)
+      glfw_extensions,
+      glfw_extensions +
+          glfw_extension_count);  // std::vector<T>(InputIt first, InputIt last)
   return extensions;
 }
 
@@ -39,5 +38,5 @@ Window2D IceWindow::get_framebuffer_size() const {
   return dimensions;
 }
 
-void IceWindow::wait_events() const { glfwWaitEvents(); }
-} // namespace ice
+void IceWindow::wait_events() { glfwWaitEvents(); }
+}  // namespace ice

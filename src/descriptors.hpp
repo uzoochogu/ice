@@ -1,5 +1,5 @@
-#ifndef DESCRIPTORS
-#define DESCRIPTORS
+#ifndef DESCRIPTORS_HPP
+#define DESCRIPTORS_HPP
 #include "config.hpp"
 
 namespace ice {
@@ -8,7 +8,7 @@ namespace ice {
         Describes the bindings of a descriptor set layout
 */
 struct DescriptorSetLayoutData {
-  std::uint32_t count;
+  std::uint32_t count{};
   std::vector<std::uint32_t> indices;
   std::vector<vk::DescriptorType> types;
   std::vector<std::uint32_t> descriptor_counts;
@@ -22,10 +22,8 @@ struct DescriptorSetLayoutData {
         \param bindings	a struct describing the bindings used in the shader
         \returns the created descriptor set layout
 */
-inline vk::DescriptorSetLayout
-make_descriptor_set_layout(vk::Device device,
-                           const DescriptorSetLayoutData &bindings) {
-
+inline vk::DescriptorSetLayout make_descriptor_set_layout(
+    vk::Device device, const DescriptorSetLayoutData& bindings) {
   /*
           Bindings describes a whole bunch of descriptor types, collect them all
      into a list of some kind.
@@ -34,8 +32,7 @@ make_descriptor_set_layout(vk::Device device,
   layout_bindings.reserve(bindings.count);
 
   for (std::uint32_t i = 0; i < bindings.count; i++) {
-
-    vk::DescriptorSetLayoutBinding layout_binding{
+    const vk::DescriptorSetLayoutBinding layout_binding{
         .binding = bindings.indices[i],
         .descriptorType = bindings.types[i],
         .descriptorCount = bindings.descriptor_counts[i],
@@ -44,14 +41,14 @@ make_descriptor_set_layout(vk::Device device,
     layout_bindings.push_back(layout_binding);
   }
 
-  vk::DescriptorSetLayoutCreateInfo layout_info{
+  const vk::DescriptorSetLayoutCreateInfo layout_info{
       .flags = vk::DescriptorSetLayoutCreateFlagBits(),
       .bindingCount = bindings.count,
       .pBindings = layout_bindings.data()};
 
   try {
     return device.createDescriptorSetLayout(layout_info);
-  } catch (vk::SystemError err) {
+  } catch (const vk::SystemError& err) {
 #ifndef NDEBUG
     std::cerr << "Failed to create Descriptor Set Layout\n";
 #endif
@@ -67,21 +64,17 @@ make_descriptor_set_layout(vk::Device device,
         \param bindings	used to get the descriptor types
         \returns the created descriptor pool
 */
-inline vk::DescriptorPool
-make_descriptor_pool(vk::Device device, uint32_t size,
-                     const DescriptorSetLayoutData &bindings) {
-
+inline vk::DescriptorPool make_descriptor_pool(
+    vk::Device device, uint32_t size, const DescriptorSetLayoutData& bindings) {
   std::vector<vk::DescriptorPoolSize> pool_sizes;
 
   for (std::uint32_t i = 0; i < bindings.count; i++) {
-    vk::DescriptorPoolSize pool_size{.type = bindings.types[i],
-                                     .descriptorCount = size
-
-    };
+    const vk::DescriptorPoolSize pool_size{.type = bindings.types[i],
+                                           .descriptorCount = size};
     pool_sizes.push_back(pool_size);
   }
 
-  vk::DescriptorPoolCreateInfo pool_info{
+  const vk::DescriptorPoolCreateInfo pool_info{
       .flags = vk::DescriptorPoolCreateFlags(),
       .maxSets = size,
       .poolSizeCount = static_cast<uint32_t>(pool_sizes.size()),
@@ -89,8 +82,7 @@ make_descriptor_pool(vk::Device device, uint32_t size,
 
   try {
     return device.createDescriptorPool(pool_info);
-  } catch (vk::SystemError err) {
-
+  } catch (const vk::SystemError& err) {
 #ifndef NDEBUG
     std::cerr << "Failed to make descriptor pool\n";
 #endif
@@ -108,23 +100,23 @@ make_descriptor_pool(vk::Device device, uint32_t size,
         \returns the allocated descriptor set
 */
 
-inline vk::DescriptorSet
-allocate_descriptor_sets(vk::Device device, vk::DescriptorPool descriptor_pool,
-                         vk::DescriptorSetLayout layout) {
-
-  vk::DescriptorSetAllocateInfo allocation_info{.descriptorPool =
-                                                    descriptor_pool,
-                                                .descriptorSetCount = 1,
-                                                .pSetLayouts = &layout};
+inline vk::DescriptorSet allocate_descriptor_sets(
+    vk::Device device, vk::DescriptorPool descriptor_pool,
+    vk::DescriptorSetLayout layout) {
+  const vk::DescriptorSetAllocateInfo allocation_info{
+      .descriptorPool = descriptor_pool,
+      .descriptorSetCount = 1,
+      .pSetLayouts = &layout};
 
   try {
     return device.allocateDescriptorSets(allocation_info)[0];
-  } catch (vk::SystemError err) {
+  } catch (const vk::SystemError& err) {
 #ifndef NDEBUG
     std::cerr << "Failed to allocate descriptor set from pool\n";
 #endif
     return nullptr;
   }
 }
-} // namespace ice
-#endif
+}  // namespace ice
+
+#endif  // DESCRIPTORS_HPP

@@ -1,38 +1,38 @@
 #ifndef ICE_TEXTURE_HPP
 #define ICE_TEXTURE_HPP
 
+#include <tiny_gltf.h>
+
 #include "../config.hpp"
 #include "ice_image.hpp"
-#include <tiny_gltf.h>
 
 namespace ice_image {
 
 class Texture {
-
-public:
+ public:
   // Defer loading to an explicit load call
   Texture() = default;
 
   // Construct and load
-  Texture(const TextureCreationInput &input);
+  explicit Texture(const TextureCreationInput &input);
   Texture(const TextureCreationInput &input,
-          std::shared_ptr<tinygltf::Image> gltf_image);
+          const std::shared_ptr<tinygltf::Image> &gltf_image);
 
-  void use(vk::CommandBuffer command_buffer,
+  void use(vk::CommandBuffer recording_command_buffer,
            vk::PipelineLayout pipeline_layout);
 
-  void
-  load(const TextureCreationInput &input,
-       std::shared_ptr<tinygltf::Image> gltf_image = nullptr); // public load
+  void load(const TextureCreationInput &input,
+            const std::shared_ptr<tinygltf::Image> &gltf_image =
+                nullptr);  // public load
   ~Texture();
 
-private:
-  int width, height, channels;
+ private:
+  int width{}, height{}, channels{};
   std::uint32_t mip_levels{1};
   vk::Device logical_device;
   vk::PhysicalDevice physical_device;
-  const char *filename;
-  stbi_uc *pixels;
+  const char *filename{};
+  stbi_uc *pixels{};
 
   // Resources
   vk::Image image;
@@ -73,6 +73,6 @@ private:
    */
   void make_descriptor_set();
 };
-} // namespace ice_image
+}  // namespace ice_image
 
-#endif
+#endif  // ICE_TEXTURE_HPP

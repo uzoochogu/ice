@@ -4,7 +4,7 @@
 #include "ice_jobs.hpp"
 namespace ice_threading {
 class WorkerThread {
-public:
+ public:
   bool &done;
   WorkQueue &work_queue;
   vk::CommandBuffer command_buffer;
@@ -15,6 +15,6 @@ public:
 
   void operator()();
 };
-} // namespace ice_threading
+}  // namespace ice_threading
 
-#endif
+#endif  // ICE_WORKER_THREADS_HPP

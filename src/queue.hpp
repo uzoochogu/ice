@@ -1,5 +1,5 @@
-#ifndef QUEUE_H
-#define QUEUE_H
+#ifndef QUEUE_HPP
+#define QUEUE_HPP
 
 #include "config.hpp"
 
@@ -10,26 +10,25 @@ struct QueueFamilyIndices {
   std::optional<std::uint32_t> graphics_family;
   std::optional<std::uint32_t> present_family;
 
-  bool is_complete() {
+  [[nodiscard]] bool is_complete() const {
     // families supporting drawing and presentation may not overlap, we want
     // both to be supported
     return graphics_family.has_value() && present_family.has_value();
   }
 };
 
-inline QueueFamilyIndices
-find_queue_families(const vk::PhysicalDevice &p_device,
-                    const vk::SurfaceKHR &surface) {
+inline QueueFamilyIndices find_queue_families(
+    const vk::PhysicalDevice &p_device, const vk::SurfaceKHR &surface) {
   QueueFamilyIndices indices;
 
-  std::uint32_t queue_family_count = 0;
-  std::vector<vk::QueueFamilyProperties> queue_families =
+  const std::uint32_t queue_family_count = 0;
+  const std::vector<vk::QueueFamilyProperties> queue_families =
       p_device.getQueueFamilyProperties();
 
   std::uint32_t i{0};
   for (const auto &queue_family : queue_families) {
     if (queue_family.queueFlags &
-        vk::QueueFlagBits::eGraphics) { // support drawing commands
+        vk::QueueFlagBits::eGraphics) {  // support drawing commands
       indices.graphics_family = i;
     }
 
@@ -45,6 +44,6 @@ find_queue_families(const vk::PhysicalDevice &p_device,
   }
   return indices;
 }
-} // namespace ice
+}  // namespace ice
 
-#endif
+#endif  // QUEUE_HPP

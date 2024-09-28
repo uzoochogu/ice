@@ -1,33 +1,32 @@
-#ifndef VULKAN_ICE
-#define VULKAN_ICE
+#ifndef VULKAN_ICE_HPP
+#define VULKAN_ICE_HPP
 
-#include "config.hpp"
-#include "mesh.hpp"
-#include "queue.hpp"
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
 
 #include "camera.hpp"
 #include "commands.hpp"
+#include "config.hpp"
 #include "descriptors.hpp"
 #include "framebuffer.hpp"
 #include "images/ice_cube_map.hpp"
 #include "images/ice_texture.hpp"
+#include "mesh.hpp"
 #include "mesh_collator.hpp"
 #include "multithreading/ice_jobs.hpp"
 #include "multithreading/ice_worker_threads.hpp"
 #include "pipeline.hpp"
+#include "queue.hpp"
 #include "swapchain.hpp"
 #include "synchronization.hpp"
-#include "triangle_mesh.hpp"
 #include "windowing.hpp"
-#include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_vulkan.h>
 
 namespace ice {
 
 // Abstraction over Vulkan initialization
 class VulkanIce {
-public:
+ public:
 #ifdef NDEBUG
   const bool enable_validation_layers = false;
 #else
@@ -35,6 +34,7 @@ public:
   void make_debug_messenger();
 
   // C-API
+  // NOLINTBEGIN (readability-identifier-naming)
   static VKAPI_ATTR VkBool32 VKAPI_CALL
   debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                 VkDebugUtilsMessageTypeFlagsEXT messageType,
@@ -44,20 +44,23 @@ public:
               << pCallbackData->pMessage << std::endl;
     return VK_FALSE;
   }
+  // NOLINTEND (readability-identifier-naming)
 
   // debug callback
   vk::DebugUtilsMessengerEXT debug_messenger{nullptr};
 #endif
 
-  VulkanIce(IceWindow &window);
-  ~VulkanIce();
+  explicit VulkanIce(IceWindow &window);
+  ~VulkanIce() noexcept;
 
   void render(Scene *scene);
   void setup_imgui_overlay();
 
-  vk::PhysicalDevice get_physical_device() const { return physical_device; };
+  [[nodiscard]] vk::PhysicalDevice get_physical_device() const {
+    return physical_device;
+  }
 
-private:
+ private:
   // instance setup
   void make_instance();
 
@@ -83,22 +86,23 @@ private:
   void prepare_frame(std::uint32_t image_index, Scene *scene);
   void prepare_scene(vk::CommandBuffer command_buffer);
   void record_sky_draw_commands(vk::CommandBuffer command_buffer,
-                                uint32_t image_index, Scene *scene);
+                                uint32_t image_index);
   void record_scene_draw_commands(vk::CommandBuffer command_buffer,
                                   uint32_t image_index, Scene *scene);
   void render_mesh(vk::CommandBuffer command_buffer, MeshTypes mesh_type,
                    uint32_t &start_instance, uint32_t instance_count);
 
   // cleanup
-  void destroy_swapchain_bundle(bool include_swapchain = true);
+  void destroy_swapchain_bundle(bool include_swapchain = true) noexcept;
+  void destroy_imgui_resources() noexcept;
 
   // utility functions
   bool is_validation_supported();
   void pick_physical_device();
-  bool
-  check_device_extension_support(const vk::PhysicalDevice &physical_device);
+  bool check_device_extension_support(
+      const vk::PhysicalDevice &physical_device);
   bool is_device_suitable(const vk::PhysicalDevice &physical_device);
-  vk::SampleCountFlagBits get_max_sample_count(); // for MSAA support
+  vk::SampleCountFlagBits get_max_sample_count();  // for MSAA support
 
   // useful data
   QueueFamilyIndices indices;
@@ -107,12 +111,10 @@ private:
   std::uint32_t max_frames_in_flight{0}, current_frame_index{0};
 
   // assets pointers
-  // TriangleMesh *triangle_mesh;
-  // std::unique_ptr<MeshCollator> meshes;
-  MeshCollator *meshes;
-  std::unordered_map<MeshTypes, ice_image::Texture *> materials;
-  GltfMesh *gltf_mesh;
-  ice_image::CubeMap *cube_map;
+  std::unique_ptr<MeshCollator> meshes;
+  std::unordered_map<MeshTypes, std::shared_ptr<ice_image::Texture>> materials;
+  std::unique_ptr<GltfMesh> gltf_mesh;
+  std::unique_ptr<ice_image::CubeMap> cube_map;
   Camera camera;
 
   // Job System
@@ -145,7 +147,7 @@ private:
   // device-related
   vk::SwapchainKHR swapchain{nullptr};
   std::vector<SwapChainFrame> swapchain_frames;
-  vk::Format swapchain_format;
+  vk::Format swapchain_format{};
   vk::Extent2D swapchain_extent;
   vk::SampleCountFlagBits msaa_samples{vk::SampleCountFlagBits::e1};
   vk::Queue graphics_queue{nullptr}, present_queue{nullptr};
@@ -155,7 +157,7 @@ private:
   // instance-related handles
   vk::SurfaceKHR surface;
   IceWindow &window;
-  vk::DispatchLoaderDynamic dldi; // dynamic instance dispatcher
+  vk::DispatchLoaderDynamic dldi;  // dynamic instance dispatcher
   vk::Instance instance{nullptr};
 
   const std::vector<const char *> validation_layers = {
@@ -163,6 +165,6 @@ private:
   const std::vector<const char *> device_extensions = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 };
-} // namespace ice
+}  // namespace ice
 
-#endif
+#endif  // VULKAN_ICE_HPP

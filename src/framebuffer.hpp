@@ -89,6 +89,6 @@ inline void make_framebuffers(const FramebufferInput &input_bundle,
   }
 }
 
-} // namespace ice
+}  // namespace ice
 
-#endif
+#endif  // FRAMEBUFFER_HPP

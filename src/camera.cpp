@@ -1,12 +1,17 @@
 #include "camera.hpp"
+
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 
+
 namespace ice {
 
-Camera::Camera(int width, int height, glm::vec3 position)
-    : camera_matrix{}, position(position), DEFAULT_POSITION(position),
-      width(width), height(height) {}
+Camera::Camera(CameraDimensions dim, glm::vec3 position)
+    : camera_matrix{},
+      position(position),
+      DEFAULT_POSITION(position),
+      width(dim.width),
+      height(dim.height) {}
 
 CameraMatrices Camera::get_camera_matrix() const { return camera_matrix; }
 
@@ -17,7 +22,7 @@ void Camera::update_matrices(float FOV_deg, float near_plane, float far_plane) {
   camera_matrix.projection =
       glm::perspective(glm::radians(FOV_deg),
                        static_cast<float>(width) / static_cast<float>(height),
-                       near_plane, far_plane); // perspective
+                       near_plane, far_plane);
   // correct to Vulkan coordinate system
   camera_matrix.projection[1][1] *= -1;
   camera_matrix.view_projection = camera_matrix.projection * camera_matrix.view;
@@ -61,22 +66,22 @@ void Camera::inputs(IceWindow *ice_window) {
     glfwWaitEvents();
     if (glfwGetKey(window, GLFW_KEY_F12) == GLFW_RELEASE) {
       // Dump values to console
-      std::cout << std::format("\n\nCamera Data:\n"
-                               "Position:\n{}\n"
-                               "Orientation:\n{}\n"
-                               "Speed:\n{}\n"
-                               "Sensitivity:\n{}\n"
-                               "++++++++++++++\n"
-                               "Camera Matrix:\n"
-                               "++++++++++++++\n"
-                               "view:\n{}\n"
-                               "projection:\n{}\n"
-                               "view-projection:\n{}\n",
-                               glm::to_string(position),
-                               glm::to_string(orientation), speed, sensitivity,
-                               glm::to_string(camera_matrix.view),
-                               glm::to_string(camera_matrix.projection),
-                               glm::to_string(camera_matrix.projection))
+      std::cout << std::format(
+                       "\n\nCamera Data:\n"
+                       "Position:\n{}\n"
+                       "Orientation:\n{}\n"
+                       "Speed:\n{}\n"
+                       "Sensitivity:\n{}\n"
+                       "++++++++++++++\n"
+                       "Camera Matrix:\n"
+                       "++++++++++++++\n"
+                       "view:\n{}\n"
+                       "projection:\n{}\n"
+                       "view-projection:\n{}\n",
+                       glm::to_string(position), glm::to_string(orientation),
+                       speed, sensitivity, glm::to_string(camera_matrix.view),
+                       glm::to_string(camera_matrix.projection),
+                       glm::to_string(camera_matrix.projection))
                 << std::endl;
     }
   }
@@ -119,7 +124,7 @@ void Camera::inputs(IceWindow *ice_window) {
     // Prevents camera from jumping on the first click
     if (first_click) {
       glfwSetCursorPos(window, static_cast<float>(width) / 2.0f,
-                       static_cast<float>(height) / 2.0f); // middle of screen
+                       static_cast<float>(height) / 2.0f);  // middle of screen
       first_click = false;
     }
 
@@ -128,12 +133,14 @@ void Camera::inputs(IceWindow *ice_window) {
 
     // Normalizes and shifts the coordinates of the cursor such that they begin
     // in the middle of the screen and then "transforms" them into degrees
-    float rot_x = sensitivity *
-                  (float)(mouse_y - (static_cast<float>(height) / 2)) /
-                  static_cast<float>(height);
-    float rot_y = sensitivity *
-                  (float)(mouse_x - (static_cast<float>(width) / 2)) /
-                  static_cast<float>(width);
+    const float rot_x =
+        sensitivity *
+        static_cast<float>(mouse_y - (static_cast<float>(height) / 2)) /
+        static_cast<float>(height);
+    const float rot_y =
+        sensitivity *
+        static_cast<float>(mouse_x - (static_cast<float>(width) / 2)) /
+        static_cast<float>(width);
 
     // Calculates upcoming vertical change in the orientation
     orientation = glm::rotate(orientation, glm::radians(-rot_x),
@@ -149,10 +156,11 @@ void Camera::inputs(IceWindow *ice_window) {
     if (camera_active) {
       camera_active = false;
       glfwSetInputMode(window, GLFW_CURSOR,
-                       GLFW_CURSOR_NORMAL); // not looking anymore
+                       GLFW_CURSOR_NORMAL);  // not looking anymore
     }
     // Makes sure the next time the camera looks around it doesn't jump
     first_click = true;
   }
 }
-} // namespace ice
+
+}  // namespace ice

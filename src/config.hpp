@@ -5,14 +5,13 @@
 #include <format>
 #include <fstream>
 #include <iostream>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
-
-#include <mutex>
-#include <thread>
 
 // Todo, create wrappers ifdef wrappers to give choice in using structs or not
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
@@ -21,8 +20,8 @@
 // Pipeline types used in the engine
 enum class PipelineType { SKY, STANDARD };
 
-inline std::vector<std::string> split(std::string line, std::string delimiter) {
-
+inline std::vector<std::string> split(std::string line,
+                                      const std::string& delimiter) {
   std::vector<std::string> split_line;
 
   size_t pos = 0;
@@ -37,4 +36,4 @@ inline std::vector<std::string> split(std::string line, std::string delimiter) {
   return split_line;
 }
 
-#endif
+#endif  // CONFIG_HPP

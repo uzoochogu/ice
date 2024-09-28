@@ -1,5 +1,7 @@
-#include "ice.hpp"
 #include <stdexcept>
+
+#include "ice.hpp"
+
 
 int main() {
   ice::Ice block;

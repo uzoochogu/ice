@@ -1,17 +1,18 @@
 #ifndef LOADERS_HPP
 #define LOADERS_HPP
 
-#include "config.hpp"
 #include <tiny_gltf.h>
+
+#include "config.hpp"
 
 namespace ice {
 // Loading Shaders
 
 // @brief Reads all bytes from specified file and return a byte array.
 inline std::vector<char> read_file(const std::string &filename) {
-  std::ifstream file(filename,
-                     std::ios::ate |
-                         std::ios::binary); // start reading at the end of file.
+  std::ifstream file(
+      filename,
+      std::ios::ate | std::ios::binary);  // start reading at the end of file.
 
   if (!file.is_open()) {
 #ifndef NDEBUG
@@ -21,12 +22,12 @@ inline std::vector<char> read_file(const std::string &filename) {
   }
 
   // determine size of file  using read position
-  std::size_t file_size = static_cast<std::size_t>(file.tellg());
-  std::vector<char> buffer(file_size); // allocate buffer to file size
+  const std::size_t file_size = static_cast<std::size_t>(file.tellg());
+  std::vector<char> buffer(file_size);
 
   // seek to beginning
   file.seekg(0);
-  file.read(buffer.data(), file_size);
+  file.read(buffer.data(), static_cast<std::streamsize>(file_size));
 
   // close file and return bytes
   file.close();
@@ -43,18 +44,18 @@ inline vk::ShaderModule create_shader_module(std::string filename,
 
   if (source_code.size() < sizeof(std::uint32_t)) {
     throw std::runtime_error("Invalid shader code");
-  } else {
-    memcpy(&magic, source_code.data(), sizeof(magic));
-    if (magic != SPIRV_MAGIC &&
-        magic != SPIRV_MAGIC_REV) { // account for endianness??
+  }
+
+  memcpy(&magic, source_code.data(), sizeof(magic));
+  if (magic != SPIRV_MAGIC &&
+      magic != SPIRV_MAGIC_REV) {  // account for endianness??
 #ifndef NDEBUG
-      std::cout << std::format(
-          "Magic number for spir-v file {} is {:#08x} -- should be {:#08x}\n",
-          filename, magic, SPIRV_MAGIC);
+    std::cout << std::format(
+        "Magic number for spir-v file {} is {:#08x} -- should be {:#08x}\n",
+        filename, magic, SPIRV_MAGIC);
 #endif
 
-      throw std::runtime_error("Incorrect SPIRV_MAGIC");
-    }
+    throw std::runtime_error("Incorrect SPIRV_MAGIC");
   }
 
 #ifndef NDEBUG
@@ -62,13 +63,13 @@ inline vk::ShaderModule create_shader_module(std::string filename,
                            SPIRV_MAGIC);
 #endif
 
-  vk::ShaderModuleCreateInfo module_info = {
+  const vk::ShaderModuleCreateInfo module_info = {
       .flags = vk::ShaderModuleCreateFlags(),
       .codeSize = source_code.size(),
       .pCode = reinterpret_cast<const uint32_t *>(source_code.data())};
   try {
     return device.createShaderModule(module_info);
-  } catch (vk::SystemError err) {
+  } catch (const vk::SystemError &err) {
     throw std::runtime_error(
         std::format("Failed to create shader module for {}", filename));
   }
@@ -83,7 +84,7 @@ inline bool load_gltf_model(tinygltf::Model &model, const char *filename) {
 
   if (!res) {
     res = loader.LoadBinaryFromFile(&model, &err, &warn,
-                                    filename); // for binary glTF(.glb)
+                                    filename);  // for binary glTF(.glb)
   }
 
 #ifndef NDEBUG
@@ -105,6 +106,6 @@ inline bool load_gltf_model(tinygltf::Model &model, const char *filename) {
   return res;
 }
 
-} // namespace ice
+}  // namespace ice
 
-#endif
+#endif  //  LOADERS_HPP

@@ -1,6 +1,7 @@
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "ice_texture.hpp"
+
 #include "../data_buffers.hpp"
 #include "../descriptors.hpp"
 
@@ -9,13 +10,12 @@ namespace ice_image {
 Texture::Texture(const TextureCreationInput &input) { load(input, nullptr); }
 
 Texture::Texture(const TextureCreationInput &input,
-                 std::shared_ptr<tinygltf::Image> gltf_image) {
+                 const std::shared_ptr<tinygltf::Image> &gltf_image) {
   load(input, gltf_image);
 }
 
 void Texture::load(const TextureCreationInput &input,
-                   std::shared_ptr<tinygltf::Image> gltf_image) {
-
+                   const std::shared_ptr<tinygltf::Image> &gltf_image) {
   logical_device = input.logical_device;
   physical_device = input.physical_device;
   filename = !input.filenames.empty() ? input.filenames[0].c_str() : "\0";
@@ -34,11 +34,13 @@ void Texture::load(const TextureCreationInput &input,
     width = gltf_image->width;
     height = gltf_image->height;
     channels = std::min(4, gltf_image->component);
-    pixels = static_cast<stbi_uc *>(new unsigned char[width * height * 4]);
+    pixels = static_cast<stbi_uc *>(
+        new unsigned char[static_cast<std::size_t>(width * height) * 4]);
 
     // RGBA format
     if (channels == 4) {
-      memcpy(pixels, gltf_image->image.data(), width * height * 4);
+      memcpy(pixels, gltf_image->image.data(),
+             static_cast<std::size_t>(width * height) * 4);
     } else {
       // Convert to RGBA
       for (int i = 0; i < width * height; ++i) {
@@ -57,22 +59,22 @@ void Texture::load(const TextureCreationInput &input,
   // Calculate mip levels
   mip_levels = static_cast<std::uint32_t>(
                    std::floor(std::log2(std::max(width, height)))) +
-               1; // at least 1
+               1;  // at least 1
 
-  ImageCreationInput image_input{.logical_device = logical_device,
-                                 .physical_device = physical_device,
-                                 .width = static_cast<std::uint32_t>(width),
-                                 .height = static_cast<std::uint32_t>(height),
-                                 .tiling = vk::ImageTiling::eOptimal,
-                                 .usage = vk::ImageUsageFlagBits::eTransferSrc |
-                                          vk::ImageUsageFlagBits::eTransferDst |
-                                          vk::ImageUsageFlagBits::eSampled,
-                                 .memory_properties =
-                                     vk::MemoryPropertyFlagBits::eDeviceLocal,
-                                 /* .format = vk::Format::eR8G8B8A8Unorm, */
-                                 .format = vk::Format::eR8G8B8A8Srgb,
-                                 .array_count = 1,
-                                 .mip_levels = mip_levels};
+  const ImageCreationInput image_input{
+      .logical_device = logical_device,
+      .physical_device = physical_device,
+      .width = static_cast<std::uint32_t>(width),
+      .height = static_cast<std::uint32_t>(height),
+      .tiling = vk::ImageTiling::eOptimal,
+      .usage = vk::ImageUsageFlagBits::eTransferSrc |
+               vk::ImageUsageFlagBits::eTransferDst |
+               vk::ImageUsageFlagBits::eSampled,
+      .memory_properties = vk::MemoryPropertyFlagBits::eDeviceLocal,
+      /* .format = vk::Format::eR8G8B8A8Unorm, */
+      .format = vk::Format::eR8G8B8A8Srgb,
+      .array_count = 1,
+      .mip_levels = mip_levels};
 
   image = make_image(image_input);
 #ifndef NDEBUG
@@ -124,15 +126,15 @@ void Texture::load() {
     std::cout << std::format("Allocated random image of size {} x {}\n", width,
                              height);
 #endif
-    pixels = new stbi_uc[width * height * channels];
-    memset(pixels, 255, width * height * channels);
+    pixels = new stbi_uc[static_cast<std::size_t>(width * height) * channels];
+    memset(pixels, 255, static_cast<std::size_t>(width * height) * channels);
   }
 }
 
 void Texture::populate() {
   // First create a CPU-visible buffer...
-  ice::BufferCreationInput input{
-      .size = static_cast<size_t>(width * height * 4),
+  const ice::BufferCreationInput input{
+      .size = static_cast<std::size_t>(width * height * 4),
       .usage = vk::BufferUsageFlagBits::eTransferSrc,
 
       .memory_properties = vk::MemoryPropertyFlagBits::eHostCoherent |
@@ -140,10 +142,9 @@ void Texture::populate() {
 
       .logical_device = logical_device,
       .physical_device = physical_device,
-
   };
 
-  ice::BufferBundle staging_buffer = create_buffer(input);
+  const ice::BufferBundle staging_buffer = create_buffer(input);
 
   // fill it,
   void *write_location =
@@ -152,7 +153,7 @@ void Texture::populate() {
   logical_device.unmapMemory(staging_buffer.buffer_memory);
 
   // transition layout
-  ImageLayoutTransitionJob transition_job{
+  const ImageLayoutTransitionJob transition_job{
       .command_buffer = command_buffer,
       .queue = queue,
       .image = image,
@@ -163,12 +164,12 @@ void Texture::populate() {
 
   transition_image_layout(transition_job);
 
-  BufferImageCopyJob copy_job{.command_buffer = command_buffer,
-                              .queue = queue,
-                              .src_buffer = staging_buffer.buffer,
-                              .dst_image = image,
-                              .width = width,
-                              .height = height};
+  const BufferImageCopyJob copy_job{.command_buffer = command_buffer,
+                                    .queue = queue,
+                                    .src_buffer = staging_buffer.buffer,
+                                    .dst_image = image,
+                                    .width = width,
+                                    .height = height};
 
   copy_buffer_to_image(copy_job);
 
@@ -194,7 +195,7 @@ void Texture::make_view() {
 }
 
 void Texture::make_sampler() {
-  vk::SamplerCreateInfo sampler_info{
+  const vk::SamplerCreateInfo sampler_info{
       .flags = vk::SamplerCreateFlags(),
       .magFilter = vk::Filter::eLinear,
       .minFilter = vk::Filter::eNearest,
@@ -214,7 +215,7 @@ void Texture::make_sampler() {
 
   try {
     sampler = logical_device.createSampler(sampler_info);
-  } catch (vk::SystemError err) {
+  } catch (const vk::SystemError &err) {
     std::cout << "Failed to make sampler." << std::endl;
   }
 #ifndef NDEBUG
@@ -223,18 +224,17 @@ void Texture::make_sampler() {
 }
 
 void Texture::make_descriptor_set() {
-
   descriptor_set =
       ice::allocate_descriptor_sets(logical_device, descriptor_pool, layout);
 
-  vk::DescriptorImageInfo image_descriptor{
+  const vk::DescriptorImageInfo image_descriptor{
       .sampler = sampler,
       .imageView = image_view,
 
       .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
   };
 
-  vk::WriteDescriptorSet descriptor_write{
+  const vk::WriteDescriptorSet descriptor_write{
       .dstSet = descriptor_set,
       .dstBinding = 0,
       .dstArrayElement = 0,
@@ -245,10 +245,11 @@ void Texture::make_descriptor_set() {
   logical_device.updateDescriptorSets(descriptor_write, nullptr);
 }
 
-void Texture::use(vk::CommandBuffer command_buffer,
-                  vk::PipelineLayout pipelineLayout) {
-  command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                    pipelineLayout, 1, descriptor_set, nullptr);
+void Texture::use(vk::CommandBuffer recording_command_buffer,
+                  vk::PipelineLayout pipeline_layout) {
+  recording_command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                              pipeline_layout, 1,
+                                              descriptor_set, nullptr);
 }
 
-} // namespace ice_image
+}  // namespace ice_image

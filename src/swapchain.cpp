@@ -4,7 +4,6 @@
 
 namespace ice {
 void SwapChainFrame::make_descriptor_resources() {
-
   BufferCreationInput input{
       .size = sizeof(CameraVectors),
       .usage = vk::BufferUsageFlagBits::eUniformBuffer,
@@ -38,7 +37,7 @@ void SwapChainFrame::make_descriptor_resources() {
 
   model_transforms.reserve(INSTANCES);
   for (std::uint32_t i = 0; i < INSTANCES; ++i) {
-    model_transforms.push_back(glm::mat4(1.0f));
+    model_transforms.emplace_back(1.0f);
   }
 
   camera_vector_descriptor_info = {.buffer = camera_vector_buffer.buffer,
@@ -60,7 +59,7 @@ void SwapChainFrame::make_depth_resources() {
       vk::ImageTiling::eOptimal,
       vk::FormatFeatureFlagBits::eDepthStencilAttachment);
 
-  ice_image::ImageCreationInput image_info{
+  const ice_image::ImageCreationInput image_info{
       .logical_device = logical_device,
       .physical_device = physical_device,
       .width = extent.width,
@@ -79,7 +78,7 @@ void SwapChainFrame::make_depth_resources() {
 }
 
 void SwapChainFrame::make_color_resources() {
-  ice_image::ImageCreationInput image_info{
+  const ice_image::ImageCreationInput image_info{
       .logical_device = logical_device,
       .physical_device = physical_device,
       .width = extent.width,
@@ -100,16 +99,16 @@ void SwapChainFrame::make_color_resources() {
 }
 
 void SwapChainFrame::record_write_operations() {
-  vk::WriteDescriptorSet camera_vector_write_op = {
+  const vk::WriteDescriptorSet camera_vector_write_op = {
       .dstSet = descriptor_sets[PipelineType::SKY],
       .dstBinding = 0,
       .dstArrayElement =
-          0, // byte offset within binding for inline uniform blocks
+          0,  // byte offset within binding for inline uniform blocks
       .descriptorCount = 1,
       .descriptorType = vk::DescriptorType::eUniformBuffer,
       .pBufferInfo = &camera_vector_descriptor_info};
 
-  vk::WriteDescriptorSet camera_matrix_write_op = {
+  const vk::WriteDescriptorSet camera_matrix_write_op = {
       .dstSet = descriptor_sets[PipelineType::STANDARD],
       .dstBinding = 0,
       .dstArrayElement = 0,
@@ -117,7 +116,7 @@ void SwapChainFrame::record_write_operations() {
       .descriptorType = vk::DescriptorType::eUniformBuffer,
       .pBufferInfo = &camera_matrix_descriptor_info};
 
-  vk::WriteDescriptorSet ssbo_write_op = {
+  const vk::WriteDescriptorSet ssbo_write_op = {
       .dstSet = descriptor_sets[PipelineType::STANDARD],
       .dstBinding = 1,
       .dstArrayElement = 0,
@@ -128,7 +127,7 @@ void SwapChainFrame::record_write_operations() {
   write_ops = {camera_vector_write_op, camera_matrix_write_op, ssbo_write_op};
 }
 
-void SwapChainFrame::write_descriptor_set() {
+void SwapChainFrame::write_descriptor_set() const {
   logical_device.updateDescriptorSets(write_ops, nullptr);
 }
 
@@ -172,4 +171,4 @@ void SwapChainFrame::destroy(vk::CommandPool imgui_command_pool) {
   logical_device.destroyImageView(color_buffer_view);
 }
 
-} // namespace ice
+}  // namespace ice

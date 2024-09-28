@@ -1,16 +1,21 @@
 #include "vulkan_ice.hpp"
+
 #include "game_objects.hpp"
+#include "images/ice_cube_map.hpp"
 #include "mesh.hpp"
+#include "mesh_collator.hpp"
 
 namespace ice {
 VulkanIce::VulkanIce(IceWindow &window)
-    : window{window}, camera{800, 600, glm::vec3(6.5f, -6.5f, 5.0f)} {
+    : window{window},
+      camera{CameraDimensions{.width = 800, .height = 600},
+             glm::vec3(6.5f, -6.5f, 5.0f)} {
   make_instance();
 
   // create surface, connect to vulkan
   VkSurfaceKHR c_style_surface;
   create_surface(instance, window.get_window(), nullptr, &c_style_surface);
-  surface = c_style_surface; // cast to C++ style
+  surface = c_style_surface;  // cast to C++ style
 
   // ImGui context
   IMGUI_CHECKVERSION();
@@ -44,17 +49,18 @@ VulkanIce::VulkanIce(IceWindow &window)
   end_worker_threads();
 }
 
-VulkanIce::~VulkanIce() {
-
-  device.waitIdle();
-
+VulkanIce::~VulkanIce() noexcept {
+  try {
+    device.waitIdle();
+  } catch (...) {
 #ifndef NDEBUG
-  std::cout << "Vulkan Destroyed" << std::endl;
+    std::cout << "Warning: Shutting down engine during operation" << std::endl;
 #endif
+  }
 
   device.destroyCommandPool(command_pool);
 
-  for (PipelineType pipeline_type : pipeline_types) {
+  for (const PipelineType pipeline_type : pipeline_types) {
     device.destroyPipeline(pipeline[pipeline_type]);
     device.destroyPipelineLayout(pipeline_layout[pipeline_type]);
     device.destroyRenderPass(renderpass[pipeline_type]);
@@ -62,7 +68,7 @@ VulkanIce::~VulkanIce() {
 
   destroy_swapchain_bundle();
 
-  for (PipelineType pipeline_type : pipeline_types) {
+  for (const PipelineType pipeline_type : pipeline_types) {
     device.destroyDescriptorSetLayout(frame_set_layout[pipeline_type]);
     device.destroyDescriptorSetLayout(mesh_set_layout[pipeline_type]);
   }
@@ -70,21 +76,15 @@ VulkanIce::~VulkanIce() {
   device.destroyDescriptorPool(mesh_descriptor_pool);
 
   // imgui resource cleanup
-  device.destroyRenderPass(imgui_renderpass);
-  device.destroyCommandPool(imgui_command_pool);
-  ImGui_ImplVulkan_Shutdown();
-  ImGui_ImplGlfw_Shutdown();
-  device.destroyDescriptorPool(imgui_descriptor_pool);
-  ImGui::DestroyContext();
+  destroy_imgui_resources();
 
-  delete meshes;
-  delete gltf_mesh;
-
-  for (const auto &[key, texture] : materials) {
-    delete texture;
+  // Asset resource ptrs
+  meshes.reset();
+  gltf_mesh.reset();
+  for (auto &[key, texture] : materials) {
+    texture.reset();
   }
-
-  delete cube_map;
+  cube_map.reset();
 
   device.destroy();
 
@@ -93,25 +93,30 @@ VulkanIce::~VulkanIce() {
 #endif
   instance.destroySurfaceKHR(surface);
   instance.destroy();
+#ifndef NDEBUG
+  std::cout << "VulkanIce Destroyed" << std::endl;
+#endif
 }
 
 void VulkanIce::make_instance() {
-  vk::ApplicationInfo appInfo{.pApplicationName = "Ice App",
-                              .applicationVersion =
-                                  VK_MAKE_API_VERSION(0, 1, 0, 0),
-                              .pEngineName = "Ice",
-                              .engineVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
-                              .apiVersion = VK_API_VERSION_1_0};
+  const vk::ApplicationInfo app_info{
+      .pApplicationName = "Ice App",
+      .applicationVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
+      .pEngineName = "Ice",
+      .engineVersion = VK_MAKE_API_VERSION(0, 1, 0, 0),
+      .apiVersion = VK_API_VERSION_1_0};
 
-  auto extensions = window.get_required_extensions();
+  auto extensions = ice::IceWindow::get_required_extensions();
 
   if (enable_validation_layers) {
     extensions.push_back(
-        VK_EXT_DEBUG_UTILS_EXTENSION_NAME); // VK_EXT_debug_utils
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME);  // VK_EXT_debug_utils
 
     if (!is_validation_supported()) {
+#ifndef NDEBUG
       std::cerr << "validation layers requested, but not available!"
                 << std::endl;
+#endif
       throw std::runtime_error(
           "validation layers requested, but not available!");
     }
@@ -119,43 +124,44 @@ void VulkanIce::make_instance() {
 
 #ifndef NDEBUG
   std::cout << "\n\nWindowing Extensions: \n";
-  for (auto extension : extensions) {
+  for (const auto &extension : extensions) {
     std::cout << extension << std::endl;
   }
 
   std::cout << "\n\nLayers: \n";
-  for (auto layer_name : validation_layers) {
+  for (const auto &layer_name : validation_layers) {
     std::cout << layer_name << std::endl;
   }
 #endif
 
-  vk::InstanceCreateInfo createInfo{
+  vk::InstanceCreateInfo create_info{
       /* .flags = vk::InstanceCreateFlags(), */
-      .pApplicationInfo = &appInfo,
+      .pApplicationInfo = &app_info,
       .enabledExtensionCount = static_cast<uint32_t>(extensions.size()),
       .ppEnabledExtensionNames = extensions.data()};
 
   if (enable_validation_layers) {
-    createInfo.enabledLayerCount =
+    create_info.enabledLayerCount =
         static_cast<std::uint32_t>(validation_layers.size());
-    createInfo.ppEnabledLayerNames = validation_layers.data();
+    create_info.ppEnabledLayerNames = validation_layers.data();
   }
 
 #ifndef NDEBUG
   for (int i = 0; i < validation_layers.size(); i++) {
     std::cout << std::format("Layer {} {}\n", i,
-                             createInfo.ppEnabledLayerNames[i]);
+                             create_info.ppEnabledLayerNames[i]);
   }
-  std::cout << std::format("Layer count {}\n", createInfo.enabledLayerCount);
+  std::cout << std::format("Layer count {}\n", create_info.enabledLayerCount);
 #endif
 
   try {
-    instance = vk::createInstance(createInfo);
-  } catch (vk::SystemError err) {
+    instance = vk::createInstance(create_info);
+  } catch (const vk::SystemError &err) {
+#ifndef NDEBUG
     std::cerr << "failed to create Instance!" << std::endl;
-    std::runtime_error("Instance creation failed. Exiting...");
+#endif
+    throw std::runtime_error("Instance creation failed. Exiting...");
   }
-
   // init Instance Dynamic loader after instance is created
   dldi = vk::DispatchLoaderDynamic(instance, vkGetInstanceProcAddr);
 
@@ -168,7 +174,8 @@ void VulkanIce::make_instance() {
 void VulkanIce::make_device() {
   pick_physical_device();
 
-  VulkanIce::indices = find_queue_families(physical_device, surface);
+  VulkanIce::indices = find_queue_families(
+      physical_device, surface);  // picked device has complete queue families.
 
   // create Queues from the Queue Families
   std::vector<vk::DeviceQueueCreateInfo> queue_create_infos;
@@ -178,16 +185,16 @@ void VulkanIce::make_device() {
       "Graphics family value {}\n"
       "Present Family value : {}\n",
       indices.graphics_family.value_or(0xFFFF),
-      indices.present_family.value_or(0xFFFF)); // prevent crash for debugging
+      indices.present_family.value_or(0xFFFF));
 #endif
 
   // Queue families, ensure uniqueness
-  std::set<std::uint32_t> unique_queue_families = {
-      indices.graphics_family.value(), indices.present_family.value()};
+  const std::set<std::uint32_t> unique_queue_families = {
+      indices.graphics_family.value_or(0), indices.present_family.value_or(0)};
 
-  float queue_priority = 1.0f;
-  for (std::uint32_t queue_family : unique_queue_families) {
-    vk::DeviceQueueCreateInfo queue_create_info{
+  const float queue_priority = 1.0f;
+  for (const std::uint32_t queue_family : unique_queue_families) {
+    const vk::DeviceQueueCreateInfo queue_create_info{
         .queueFamilyIndex = queue_family,
         .queueCount = 1,
         .pQueuePriorities = &queue_priority};
@@ -197,8 +204,8 @@ void VulkanIce::make_device() {
 
   // Pick device features you want
   // sample rate shading can boost frame rate when multisampling is enabled
-  vk::PhysicalDeviceFeatures device_features{.sampleRateShading = vk::True,
-                                             .samplerAnisotropy = vk::True};
+  const vk::PhysicalDeviceFeatures device_features{
+      .sampleRateShading = vk::True, .samplerAnisotropy = vk::True};
 
   // Create device
   vk::DeviceCreateInfo device_info{
@@ -215,12 +222,6 @@ void VulkanIce::make_device() {
     device_info.ppEnabledLayerNames = validation_layers.data();
   }
 
-  /* try {
-    device = physical_device.createDevice(device_info, nullptr);
-  } catch (vk::SystemError err) {
-    std::cerr << "failed to create logical device" << std::endl;
-    throw std::runtime_error("failed to create logical device");
-  } */
   device = physical_device.createDevice(device_info, nullptr);
   if (device == nullptr) {
     std::cerr << "failed to create logical device" << std::endl;
@@ -229,14 +230,15 @@ void VulkanIce::make_device() {
 
   // Pair Device with Queue
   VulkanIce::graphics_queue =
-      device.getQueue(indices.graphics_family.value(), 0);
-  VulkanIce::present_queue = device.getQueue(indices.present_family.value(), 0);
+      device.getQueue(indices.graphics_family.value_or(0), 0);
+  VulkanIce::present_queue =
+      device.getQueue(indices.present_family.value_or(0), 0);
 }
 
 void VulkanIce::setup_swapchain(vk::SwapchainKHR *old_swapchain) {
   msaa_samples =
       std::min(get_max_sample_count(),
-               vk::SampleCountFlagBits::e8); // capped at 8 BIT for now
+               vk::SampleCountFlagBits::e8);  // capped at 8 BIT for now
 #ifndef NDEBUG
   std::cout << std::format("Max MSAA samples: {}\nChosen MSAA samples: {}",
                            vk::to_string(get_max_sample_count()),
@@ -251,7 +253,7 @@ void VulkanIce::setup_swapchain(vk::SwapchainKHR *old_swapchain) {
   swapchain_frames = bundle.frames;
   swapchain_format = bundle.format;
   swapchain_extent =
-      bundle.frames[0].extent; // at least one frame is guaranteed
+      bundle.frames[0].extent;  // at least one frame is guaranteed
 
   // update camera dims
   camera.set_width(swapchain_extent.width);
@@ -268,7 +270,8 @@ void VulkanIce::setup_descriptor_set_layouts() {
   frame_set_layout_bindings.indices.push_back(0);
   frame_set_layout_bindings.types.push_back(vk::DescriptorType::eUniformBuffer);
   frame_set_layout_bindings.descriptor_counts.push_back(1);
-  frame_set_layout_bindings.stages.push_back(vk::ShaderStageFlagBits::eVertex);
+  frame_set_layout_bindings.stages.emplace_back(
+      vk::ShaderStageFlagBits::eVertex);
 
   // SKY PIPELINE needs only 1 uniform binding
   frame_set_layout[PipelineType::SKY] =
@@ -279,7 +282,8 @@ void VulkanIce::setup_descriptor_set_layouts() {
   frame_set_layout_bindings.indices.push_back(1);
   frame_set_layout_bindings.types.push_back(vk::DescriptorType::eStorageBuffer);
   frame_set_layout_bindings.descriptor_counts.push_back(1);
-  frame_set_layout_bindings.stages.push_back(vk::ShaderStageFlagBits::eVertex);
+  frame_set_layout_bindings.stages.emplace_back(
+      vk::ShaderStageFlagBits::eVertex);
 
   // set and bindings once per frame for STANDARD PIPELINE
   frame_set_layout[PipelineType::STANDARD] =
@@ -292,7 +296,8 @@ void VulkanIce::setup_descriptor_set_layouts() {
   mesh_set_layout_bindings.types.push_back(
       vk::DescriptorType::eCombinedImageSampler);
   mesh_set_layout_bindings.descriptor_counts.push_back(1);
-  mesh_set_layout_bindings.stages.push_back(vk::ShaderStageFlagBits::eFragment);
+  mesh_set_layout_bindings.stages.emplace_back(
+      vk::ShaderStageFlagBits::eFragment);
 
   mesh_set_layout[PipelineType::SKY] =
       make_descriptor_set_layout(device, mesh_set_layout_bindings);
@@ -302,16 +307,14 @@ void VulkanIce::setup_descriptor_set_layouts() {
 
 namespace {
 // Utility Error Function used for ImGui code.
-static void check_vk_result(VkResult err) {
-  if (err == 0)
-    return;
+void check_vk_result(VkResult err) {
+  if (err == 0) return;
 #ifndef NDEBUG
-  fprintf(stderr, "ImGui [vulkan] Error: VkResult = %d\n", err);
+  const int out = fprintf(stderr, "ImGui [vulkan] Error: VkResult = %d\n", err);
 #endif
-  if (err < 0)
-    abort();
+  if (err < 0) abort();
 }
-} // namespace
+}  // namespace
 
 void VulkanIce::setup_imgui_overlay() {
   // Platform/Renderer backends
@@ -320,7 +323,7 @@ void VulkanIce::setup_imgui_overlay() {
   init_info.Instance = instance;
   init_info.PhysicalDevice = physical_device;
   init_info.Device = device;
-  init_info.QueueFamily = indices.graphics_family.value();
+  init_info.QueueFamily = indices.graphics_family.value_or(0);
   init_info.Queue = graphics_queue;
   init_info.PipelineCache = vk::PipelineCache{};
   init_info.DescriptorPool = imgui_descriptor_pool;
@@ -328,7 +331,7 @@ void VulkanIce::setup_imgui_overlay() {
   init_info.Subpass = 0;
   {
     // Already sized to the minImageCount + 1 &&  < MaxImageCount
-    std::uint32_t image_count = static_cast<uint32_t>(swapchain_frames.size());
+    const auto image_count = static_cast<uint32_t>(swapchain_frames.size());
     init_info.MinImageCount = image_count;
     init_info.ImageCount = image_count;
   }
@@ -355,9 +358,9 @@ void VulkanIce::setup_pipeline_bundles() {
 
   GraphicsPipelineOutBundle graphics_bundle = make_graphics_pipeline(spec);
 
-  pipeline_layout[PipelineType::SKY] = std::move(graphics_bundle.layout);
-  renderpass[PipelineType::SKY] = std::move(graphics_bundle.renderpass);
-  pipeline[PipelineType::SKY] = std::move(graphics_bundle.pipeline);
+  pipeline_layout[PipelineType::SKY] = graphics_bundle.layout;
+  renderpass[PipelineType::SKY] = graphics_bundle.renderpass;
+  pipeline[PipelineType::SKY] = graphics_bundle.pipeline;
 
   // STANDARD PIPELINE
   spec.vertex_filepath = "resources/shaders/vert.spv";
@@ -374,21 +377,21 @@ void VulkanIce::setup_pipeline_bundles() {
 
   graphics_bundle = make_graphics_pipeline(spec);
 
-  pipeline_layout[PipelineType::STANDARD] = std::move(graphics_bundle.layout);
-  renderpass[PipelineType::STANDARD] = std::move(graphics_bundle.renderpass);
-  pipeline[PipelineType::STANDARD] = std::move(graphics_bundle.pipeline);
+  pipeline_layout[PipelineType::STANDARD] = graphics_bundle.layout;
+  renderpass[PipelineType::STANDARD] = graphics_bundle.renderpass;
+  pipeline[PipelineType::STANDARD] = graphics_bundle.pipeline;
 
   // imgui renderpass
-  imgui_renderpass = make_imgui_renderpass(device, swapchain_format,
-                                           swapchain_frames[0].depth_format);
+  imgui_renderpass = make_imgui_renderpass(device, swapchain_format);
 }
 
 void VulkanIce::setup_framebuffers() {
   // Finalize setup
-  FramebufferInput framebuffer_input{.device = device,
-                                     .renderpass = renderpass,
-                                     .imgui_renderpass = imgui_renderpass,
-                                     .swapchain_extent = swapchain_extent};
+  const FramebufferInput framebuffer_input{
+      .device = device,
+      .renderpass = renderpass,
+      .imgui_renderpass = imgui_renderpass,
+      .swapchain_extent = swapchain_extent};
 
   // populate frame buffers (including imgui's), one for each swapchain image.
   make_framebuffers(framebuffer_input, swapchain_frames);
@@ -446,9 +449,9 @@ void VulkanIce::recreate_swapchain() {
   // pause until the window is in the foreground again
   // check for size
   ice::Window2D window_dim{window.get_framebuffer_size()};
-  while (window_dim.width == 0 || window_dim.width == 0) {
+  while (window_dim.width == 0 || window_dim.height == 0) {
     window_dim = window.get_framebuffer_size();
-    window.wait_events();
+    ice::IceWindow::wait_events();
   }
   device.waitIdle();
 
@@ -490,26 +493,26 @@ void VulkanIce::recreate_swapchain() {
 
 void VulkanIce::make_worker_threads() {
   done = false;
-  size_t thread_count = std::jthread::hardware_concurrency() - 1;
+  const std::size_t thread_count = std::jthread::hardware_concurrency() - 1;
 
   workers.reserve(thread_count);
-  CommandBufferReq command_buffer_input = {device, command_pool,
-                                           swapchain_frames};
-  for (size_t i = 0; i < thread_count; ++i) {
-    vk::CommandBuffer command_buffer =
+  const CommandBufferReq command_buffer_input = {device, command_pool,
+                                                 swapchain_frames};
+  for (std::size_t i = 0; i < thread_count; ++i) {
+    const vk::CommandBuffer command_buffer =
         make_command_buffer(command_buffer_input);
-    workers.push_back(std::jthread(ice_threading::WorkerThread(
-        work_queue, done, command_buffer, graphics_queue)));
+    workers.emplace_back(ice_threading::WorkerThread(
+        work_queue, done, command_buffer, graphics_queue));
   }
 }
 
 void VulkanIce::make_assets() {
-
   // Meshes
-  meshes = new MeshCollator();
+  meshes = std::make_unique<MeshCollator>();
+  // meshes = new MeshCollator();
 
   // <mesh type , filenames, pre_transforms> prep
-  std::vector<std::tuple<MeshTypes, std::vector<const char *>, glm::mat4>>
+  const std::vector<std::tuple<MeshTypes, std::vector<const char *>, glm::mat4>>
       model_inputs = {
           {MeshTypes::GROUND,
            /* obj file path, material file path*/
@@ -542,7 +545,7 @@ void VulkanIce::make_assets() {
   // mesh descriptor pool to allocate sets
   mesh_descriptor_pool = make_descriptor_pool(
       device, static_cast<uint32_t>(texture_filenames.size()) + 1,
-      mesh_set_layout_bindings); // extra set for cube map
+      mesh_set_layout_bindings);  // extra set for cube map
 
   ice_image::TextureCreationInput texture_info{
       .physical_device = physical_device,
@@ -565,7 +568,7 @@ void VulkanIce::make_assets() {
     texture_info.filenames = {texture_filenames[mesh_type]};
 
     // Default construct without loading
-    materials[mesh_type] = new ice_image::Texture();
+    materials[mesh_type] = std::make_shared<ice_image::Texture>();
     models[mesh_type] = ObjMesh();
 
     // Add loading jobs
@@ -608,7 +611,7 @@ void VulkanIce::make_assets() {
     meshes->consume(mesh_type, model.vertices, model.indices);
   }
 
-  VertexBufferFinalizationInput finalization_info{
+  const VertexBufferFinalizationInput finalization_info{
       .logical_device = device,
       .physical_device = physical_device,
       .command_buffer = main_command_buffer,
@@ -627,25 +630,25 @@ void VulkanIce::make_assets() {
   // Sky Texture
   texture_info.layout = mesh_set_layout[PipelineType::SKY];
   texture_info.filenames = {{
-      "resources/textures/sky_front.png",  // x+
-      "resources/textures/sky_back.png",   // x-
-      "resources/textures/sky_left.png",   // y+
-      "resources/textures/sky_right.png",  // y-
-      "resources/textures/sky_bottom.png", // z+
-      "resources/textures/sky_top.png",    // z-
+      "resources/textures/sky_front.png",   // x+
+      "resources/textures/sky_back.png",    // x-
+      "resources/textures/sky_left.png",    // y+
+      "resources/textures/sky_right.png",   // y-
+      "resources/textures/sky_bottom.png",  // z+
+      "resources/textures/sky_top.png",     // z-
   }};
-  cube_map = new ice_image::CubeMap(texture_info);
+  cube_map = std::make_unique<ice_image::CubeMap>(texture_info);
 
   // GltfMesh
   // Create a larger descriptor pool for GLTF mesh textures
-  DescriptorSetLayoutData gltf_texture_layout_bindings = {
+  const DescriptorSetLayoutData gltf_texture_layout_bindings = {
       .count = 1,
       .indices = {0},
       .types = {vk::DescriptorType::eCombinedImageSampler},
       .descriptor_counts = {1},
       .stages = {vk::ShaderStageFlagBits::eFragment}};
 
-  vk::DescriptorPool gltf_descriptor_pool =
+  const vk::DescriptorPool gltf_descriptor_pool =
       make_descriptor_pool(device, 1000, gltf_texture_layout_bindings);
 
   // TRS
@@ -664,7 +667,7 @@ void VulkanIce::make_assets() {
   start = std::chrono::high_resolution_clock::now();
 #endif
   // make GLTF MESH
-  gltf_mesh = new GltfMesh(
+  gltf_mesh = std::make_unique<GltfMesh>(
       physical_device, device, main_command_buffer, graphics_queue,
       mesh_set_layout[PipelineType::STANDARD], gltf_descriptor_pool,
       // "resources/models/Box.gltf", pre_transform);
@@ -693,7 +696,7 @@ void VulkanIce::make_assets() {
       vk::DescriptorPoolSize{vk::DescriptorType::eStorageBufferDynamic, 1000},
       vk::DescriptorPoolSize{vk::DescriptorType::eInputAttachment, 1000}};
 
-  vk::DescriptorPoolCreateInfo imgui_pool_info{
+  const vk::DescriptorPoolCreateInfo imgui_pool_info{
       .flags = vk::DescriptorPoolCreateFlags() |
                vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
       .maxSets = 1,
@@ -702,7 +705,7 @@ void VulkanIce::make_assets() {
 
   try {
     imgui_descriptor_pool = device.createDescriptorPool(imgui_pool_info);
-  } catch (vk::SystemError err) {
+  } catch (const vk::SystemError &err) {
 #ifndef NDEBUG
     std::cout << "Failed to make imgui descriptor pool\n";
 #endif
@@ -715,8 +718,8 @@ void VulkanIce::make_assets() {
 void VulkanIce::end_worker_threads() {
   done = true;
 
-  for (size_t i = 0; i < workers.size(); ++i) {
-    workers[i].join();
+  for (auto &worker : workers) {
+    worker.join();
   }
 #ifndef NDEBUG
   std::cout << "Threads ended successfully." << std::endl;
@@ -724,45 +727,47 @@ void VulkanIce::end_worker_threads() {
 }
 
 void VulkanIce::prepare_frame(std::uint32_t image_index, Scene *scene) {
-
   // camera code
   camera.inputs(&window);
   // increase far plane distance to prevent clipping
   camera.update_matrices(45.0f, 0.1f, 100000.0f);
 
-  SwapChainFrame &_frame =
-      swapchain_frames[image_index]; // swapchain frame alias
+  SwapChainFrame &frame =
+      swapchain_frames[image_index];  // swapchain frame alias
 
   // update camera vector
-  _frame.camera_vector_data = camera.get_camera_vector();
+  frame.camera_vector_data = camera.get_camera_vector();
 
-  memcpy(_frame.camera_vector_write_location, &(_frame.camera_vector_data),
+  memcpy(frame.camera_vector_write_location, &(frame.camera_vector_data),
          sizeof(CameraVectors));
 
   // update camera matrix
-  _frame.camera_matrix_data = camera.get_camera_matrix();
+  frame.camera_matrix_data = camera.get_camera_matrix();
 
-  memcpy(_frame.camera_matrix_write_location, &(_frame.camera_matrix_data),
+  memcpy(frame.camera_matrix_write_location, &(frame.camera_matrix_data),
          sizeof(CameraMatrices));
 
   // model transforms info
   size_t i = 0;
-  for (std::pair<MeshTypes, std::vector<glm::vec3>> pair : scene->positions) {
-    for (glm::vec3 &position : pair.second) {
-      _frame.model_transforms[i++] = glm::translate(glm::mat4(1.0f), position);
+  for (const std::pair<MeshTypes, std::vector<glm::vec3>> pair :
+       scene->positions) {
+    for (const glm::vec3 &position : pair.second) {
+      frame.model_transforms[i++] = glm::translate(glm::mat4(1.0f), position);
     }
   }
 
-  memcpy(_frame.model_buffer_write_location, _frame.model_transforms.data(),
+  memcpy(frame.model_buffer_write_location, frame.model_transforms.data(),
          i * sizeof(glm::mat4));
 
-  _frame.write_descriptor_set();
+  frame.write_descriptor_set();
 }
 
 void VulkanIce::prepare_scene(vk::CommandBuffer command_buffer) {
-  vk::Buffer vertex_buffers[] = {meshes->vertex_buffer.buffer};
-  vk::DeviceSize offsets[] = {0};
-  command_buffer.bindVertexBuffers(0, 1, vertex_buffers, offsets);
+  std::array<vk::Buffer, 1> vertex_buffers = {meshes->vertex_buffer.buffer};
+  std::array<vk::DeviceSize, 1> offsets = {0};
+  command_buffer.bindVertexBuffers(
+      0, static_cast<std::uint32_t>(vertex_buffers.size()),
+      vertex_buffers.data(), offsets.data());
   command_buffer.bindIndexBuffer(meshes->index_buffer.buffer, 0,
                                  vk::IndexType::eUint32);
 }
@@ -770,7 +775,7 @@ void VulkanIce::prepare_scene(vk::CommandBuffer command_buffer) {
 // @brief Logic for rendering frames.
 void VulkanIce::render(Scene *scene) {
   const ice::SwapChainFrame &current_frame =
-      swapchain_frames[current_frame_index]; // alias
+      swapchain_frames[current_frame_index];  // alias
 
   vk::Result result = device.waitForFences(1, &current_frame.in_flight_fence,
                                            vk::True, UINT64_MAX);
@@ -784,10 +789,10 @@ void VulkanIce::render(Scene *scene) {
   try {
     // acquireNextImageKHR(vk::SwapChainKHR, timeout, semaphore_to_signal,
     // fence)
-    vk::ResultValue acquire = device.acquireNextImageKHR(
+    const vk::ResultValue acquire = device.acquireNextImageKHR(
         swapchain, UINT64_MAX, current_frame.image_available, nullptr);
     acquired_image_index = acquire.value;
-  } catch (vk::OutOfDateKHRError) {
+  } catch (const vk::OutOfDateKHRError &err) {
 #ifndef NDEBUG
     std::cout << "Acquire error, Out of DateKHR\n";
 #endif
@@ -795,7 +800,7 @@ void VulkanIce::render(Scene *scene) {
     return;
   }
 
-  vk::CommandBuffer command_buffer = current_frame.command_buffer;
+  const vk::CommandBuffer command_buffer = current_frame.command_buffer;
 
   command_buffer.reset();
 
@@ -806,18 +811,17 @@ void VulkanIce::render(Scene *scene) {
 
   try {
     command_buffer.begin(begin_info);
-  } catch (vk::SystemError err) {
+  } catch (const vk::SystemError &err) {
     throw std::runtime_error("Failed to begin recording command buffer!");
   }
   // record events
-  record_sky_draw_commands(command_buffer, acquired_image_index, scene);
+  record_sky_draw_commands(command_buffer, acquired_image_index);
   record_scene_draw_commands(command_buffer, acquired_image_index, scene);
 
   // end
   try {
     command_buffer.end();
-  } catch (vk::SystemError err) {
-
+  } catch (const vk::SystemError &err) {
     throw std::runtime_error("failed to record command buffer!");
   }
 
@@ -828,10 +832,10 @@ void VulkanIce::render(Scene *scene) {
     // Render pass
     {
       // clear values unions
-      vk::ClearValue clear_color =
+      const vk::ClearValue clear_color =
           vk::ClearColorValue({std::array<float, 4>{1.0f, 0.5f, 0.25f, 1.0f}});
 
-      vk::RenderPassBeginInfo info = {
+      const vk::RenderPassBeginInfo info = {
           .renderPass = imgui_renderpass,
           .framebuffer =
               swapchain_frames[acquired_image_index].imgui_framebuffer,
@@ -857,41 +861,42 @@ void VulkanIce::render(Scene *scene) {
       command_buffer, current_frame.imgui_command_buffer};
 
   // semaphores
-  vk::Semaphore wait_semaphores[] = {current_frame.image_available};
-  vk::PipelineStageFlags wait_stages[] = {
+  std::array<vk::Semaphore, 1> wait_semaphores = {
+      current_frame.image_available};
+  const std::array<vk::PipelineStageFlags, 1> wait_stages = {
       vk::PipelineStageFlagBits::eColorAttachmentOutput};
-  vk::Semaphore signal_semaphores[] = {current_frame.render_finished};
+  std::array<vk::Semaphore, 1> signal_semaphores = {
+      current_frame.render_finished};
 
-  vk::SubmitInfo submit_info = {
-      .waitSemaphoreCount = 1,
-      .pWaitSemaphores = wait_semaphores,
-      .pWaitDstStageMask = wait_stages,
+  const vk::SubmitInfo submit_info = {
+      .waitSemaphoreCount = static_cast<uint32_t>(wait_semaphores.size()),
+      .pWaitSemaphores = wait_semaphores.data(),
+      .pWaitDstStageMask = wait_stages.data(),
       .commandBufferCount =
           static_cast<uint32_t>(submit_command_buffers.size()),
       .pCommandBuffers = submit_command_buffers.data(),
 
-      .signalSemaphoreCount = 1,
-      .pSignalSemaphores = signal_semaphores};
+      .signalSemaphoreCount = static_cast<uint32_t>(signal_semaphores.size()),
+      .pSignalSemaphores = signal_semaphores.data()};
 
   try {
     graphics_queue.submit(submit_info, current_frame.in_flight_fence);
-  } catch (vk::SystemError err) {
-
+  } catch (const vk::SystemError &err) {
     throw std::runtime_error("failed to submit draw command buffer!");
   }
 
-  vk::SwapchainKHR swapchains[] = {swapchain};
-  vk::PresentInfoKHR present_info = {
-      .waitSemaphoreCount = 1,
-      .pWaitSemaphores = signal_semaphores,
-      .swapchainCount = 1,
-      .pSwapchains = swapchains,
+  std::array<vk::SwapchainKHR, 1> swapchains = {swapchain};
+  const vk::PresentInfoKHR present_info = {
+      .waitSemaphoreCount = static_cast<uint32_t>(signal_semaphores.size()),
+      .pWaitSemaphores = signal_semaphores.data(),
+      .swapchainCount = static_cast<uint32_t>(swapchains.size()),
+      .pSwapchains = swapchains.data(),
       .pImageIndices = &acquired_image_index,
   };
 
   try {
     result = present_queue.presentKHR(present_info);
-  } catch (vk::OutOfDateKHRError) {
+  } catch (const vk::OutOfDateKHRError &err) {
 #ifndef NDEBUG
     std::cout << "Present Error, Out of DateKHR/ Suboptimal KHR\n";
 #endif
@@ -909,8 +914,10 @@ void VulkanIce::render(Scene *scene) {
 void VulkanIce::render_mesh(vk::CommandBuffer command_buffer,
                             MeshTypes mesh_type, uint32_t &start_instance,
                             uint32_t instance_count) {
-  int index_count = meshes->index_counts.find(mesh_type)->second;
-  int first_index = meshes->index_lump_offsets.find(mesh_type)->second;
+  const std::uint32_t index_count =
+      meshes->index_counts.find(mesh_type)->second;
+  const std::uint32_t first_index =
+      meshes->index_lump_offsets.find(mesh_type)->second;
   materials[mesh_type]->use(command_buffer,
                             pipeline_layout[PipelineType::STANDARD]);
   command_buffer.drawIndexed(index_count, instance_count, first_index, 0,
@@ -919,8 +926,8 @@ void VulkanIce::render_mesh(vk::CommandBuffer command_buffer,
 }
 
 void VulkanIce::record_sky_draw_commands(vk::CommandBuffer command_buffer,
-                                         uint32_t image_index, Scene *scene) {
-  vk::RenderPassBeginInfo renderpass_info = {
+                                         uint32_t image_index) {
+  const vk::RenderPassBeginInfo renderpass_info = {
       .renderPass = renderpass[PipelineType::SKY],
       .framebuffer =
           swapchain_frames[image_index].framebuffer[PipelineType::SKY],
@@ -936,15 +943,16 @@ void VulkanIce::record_sky_draw_commands(vk::CommandBuffer command_buffer,
                               pipeline[PipelineType::SKY]);
 
   // dynamic viewport and scissor specification
-  vk::Viewport viewport{.x = 0.0f,
-                        .y = 0.0f,
-                        .width = static_cast<float>(swapchain_extent.width),
-                        .height = static_cast<float>(swapchain_extent.height),
-                        .minDepth = 0.0f,
-                        .maxDepth = 1.0f};
+  const vk::Viewport viewport{
+      .x = 0.0f,
+      .y = 0.0f,
+      .width = static_cast<float>(swapchain_extent.width),
+      .height = static_cast<float>(swapchain_extent.height),
+      .minDepth = 0.0f,
+      .maxDepth = 1.0f};
   command_buffer.setViewport(0, 1, &viewport);
 
-  vk::Rect2D scissor{.offset = {0, 0}, .extent = swapchain_extent};
+  const vk::Rect2D scissor{.offset = {0, 0}, .extent = swapchain_extent};
   command_buffer.setScissor(0, 1, &scissor);
 
   command_buffer.bindDescriptorSets(
@@ -961,13 +969,13 @@ void VulkanIce::record_sky_draw_commands(vk::CommandBuffer command_buffer,
 void VulkanIce::record_scene_draw_commands(vk::CommandBuffer command_buffer,
                                            uint32_t image_index, Scene *scene) {
   // clear values unions
-  vk::ClearValue clear_color =
+  const vk::ClearValue clear_color =
       vk::ClearColorValue({std::array<float, 4>{1.0f, 0.5f, 0.25f, 1.0f}});
-  vk::ClearValue clear_depth = vk::ClearDepthStencilValue({1.0f, 0});
+  const vk::ClearValue clear_depth = vk::ClearDepthStencilValue({1.0f, 0});
 
   std::vector<vk::ClearValue> clear_values = {{clear_color, clear_depth}};
 
-  vk::RenderPassBeginInfo renderpass_info = {
+  const vk::RenderPassBeginInfo renderpass_info = {
       .renderPass = renderpass[PipelineType::STANDARD],
       .framebuffer =
           swapchain_frames[image_index].framebuffer[PipelineType::STANDARD],
@@ -986,15 +994,16 @@ void VulkanIce::record_scene_draw_commands(vk::CommandBuffer command_buffer,
   command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
                               pipeline[PipelineType::STANDARD]);
 
-  vk::Viewport viewport{.x = 0.0f,
-                        .y = 0.0f,
-                        .width = static_cast<float>(swapchain_extent.width),
-                        .height = static_cast<float>(swapchain_extent.height),
-                        .minDepth = 0.0f,
-                        .maxDepth = 1.0f};
+  const vk::Viewport viewport{
+      .x = 0.0f,
+      .y = 0.0f,
+      .width = static_cast<float>(swapchain_extent.width),
+      .height = static_cast<float>(swapchain_extent.height),
+      .minDepth = 0.0f,
+      .maxDepth = 1.0f};
   command_buffer.setViewport(0, 1, &viewport);
 
-  vk::Rect2D scissor{.offset = {0, 0}, .extent = swapchain_extent};
+  const vk::Rect2D scissor{.offset = {0, 0}, .extent = swapchain_extent};
   command_buffer.setScissor(0, 1, &scissor);
 
   command_buffer.bindDescriptorSets(
@@ -1018,9 +1027,12 @@ void VulkanIce::record_scene_draw_commands(vk::CommandBuffer command_buffer,
     const auto &mesh_buffer = gltf_mesh->mesh_buffers[i];
 
     // Bind vertex buffer
-    vk::Buffer vertex_buffers[] = {mesh_buffer.vertex_buffer.buffer};
-    vk::DeviceSize offsets[] = {0};
-    command_buffer.bindVertexBuffers(0, 1, vertex_buffers, offsets);
+    std::array<vk::Buffer, 1> vertex_buffers = {
+        mesh_buffer.vertex_buffer.buffer};
+    std::array<vk::DeviceSize, 1> offsets = {0};
+    command_buffer.bindVertexBuffers(
+        0, static_cast<std::uint32_t>(vertex_buffers.size()),
+        vertex_buffers.data(), offsets.data());
 
     // Bind index buffer
     command_buffer.bindIndexBuffer(mesh_buffer.index_buffer.buffer, 0,
@@ -1033,7 +1045,7 @@ void VulkanIce::record_scene_draw_commands(vk::CommandBuffer command_buffer,
     }
 
     // Draw the mesh
-    uint32_t index_count = gltf_mesh->index_counts[i];
+    const std::uint32_t index_count = gltf_mesh->index_counts[i];
     command_buffer.drawIndexed(index_count, 1, 0, 0, 0);
   }
 
@@ -1048,8 +1060,7 @@ void VulkanIce::make_debug_messenger() {
   }
   std::cout << "Making debug messenger\n\n" << std::endl;
   // fill structure with details about the messenger and its callback
-  vk::DebugUtilsMessengerCreateInfoEXT create_info = {
-      /* .flags = vk::DebugUtilsMessengerCreateFlagsEXT(), */
+  const vk::DebugUtilsMessengerCreateInfoEXT create_info = {
       .messageSeverity =
           /* exclude Info bit */
       /*       vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo | */
@@ -1077,18 +1088,17 @@ void VulkanIce::make_debug_messenger() {
 // Utils
 bool VulkanIce::is_validation_supported() {
   std::uint32_t layer_count;
-  vk::Result err = vk::enumerateInstanceLayerProperties(
-      &layer_count,
-      nullptr); // vkEnumerateXxxxYyyyProperties
-                // queries Xxxx properties
+  vk::Result err = vk::enumerateInstanceLayerProperties(&layer_count, nullptr);
 
   std::vector<vk::LayerProperties> available_layers(layer_count);
   err = vk::enumerateInstanceLayerProperties(&layer_count,
                                              available_layers.data());
 
   if (err != vk::Result::eSuccess) {
+#ifndef NDEBUG
     std::cerr << "Problem enumerating validation layers properties"
               << std::endl;
+#endif
     return false;
   }
 
@@ -1112,8 +1122,7 @@ bool VulkanIce::is_validation_supported() {
 
 bool VulkanIce::check_device_extension_support(
     const vk::PhysicalDevice &physical_device) {
-
-  std::vector<vk::ExtensionProperties> available_extensions =
+  const std::vector<vk::ExtensionProperties> available_extensions =
       physical_device.enumerateDeviceExtensionProperties();
 
   // Copy required extensions defined globally
@@ -1121,27 +1130,30 @@ bool VulkanIce::check_device_extension_support(
                                             device_extensions.end());
   for (const auto &extension : available_extensions) {
     required_extensions.erase(
-        extension.extensionName); // erase will succeed if present
+        extension.extensionName);  // erase will succeed if present
   }
-  return required_extensions.empty(); // all required extensions are present
+  return required_extensions.empty();  // all required extensions are present
 }
 
 // internal utility functions
 bool VulkanIce::is_device_suitable(const vk::PhysicalDevice &physical_device) {
-  QueueFamilyIndices indices = find_queue_families(physical_device, surface);
-  bool extensions_supported = check_device_extension_support(physical_device);
+  const QueueFamilyIndices indices =
+      find_queue_families(physical_device, surface);
+  const bool extensions_supported =
+      check_device_extension_support(physical_device);
 
   bool swapchain_adequate = false;
   // only query for swapchain support after verifying the extension is
   // available
   if (extensions_supported) {
-    SwapChainSupportDetails swapchain_support =
+    const SwapChainSupportDetails swapchain_support =
         query_swapchain_support(physical_device, surface);
     swapchain_adequate = !swapchain_support.formats.empty() &&
                          !swapchain_support.present_modes.empty();
   }
 
-  vk::PhysicalDeviceFeatures supported_features = physical_device.getFeatures();
+  const vk::PhysicalDeviceFeatures supported_features =
+      physical_device.getFeatures();
 
 #ifndef NDEBUG
   std::cout << std::format("The value of indices: {}\n",
@@ -1160,7 +1172,7 @@ bool VulkanIce::is_device_suitable(const vk::PhysicalDevice &physical_device) {
  * @exception It throws a runtime error if it fails to pick a physical device.
  */
 void VulkanIce::pick_physical_device() {
-  std::vector<vk::PhysicalDevice> available_devices =
+  const std::vector<vk::PhysicalDevice> available_devices =
       instance.enumeratePhysicalDevices();
 
   for (auto device : available_devices) {
@@ -1173,10 +1185,11 @@ void VulkanIce::pick_physical_device() {
 
       vk::PhysicalDeviceProperties properties = physical_device.getProperties();
 
-      std::cout << std::format("Device Name: {}\n"
-                               "Device Type: {}\n",
-                               properties.deviceName.data(),
-                               vk::to_string(properties.deviceType))
+      std::cout << std::format(
+                       "Device Name: {}\n"
+                       "Device Type: {}\n",
+                       properties.deviceName.data(),
+                       vk::to_string(properties.deviceType))
                 << std::endl;
 #endif
       return;
@@ -1192,11 +1205,11 @@ void VulkanIce::pick_physical_device() {
 
 vk::SampleCountFlagBits VulkanIce::get_max_sample_count() {
   // maximum number of samples
-  vk::PhysicalDeviceProperties physical_device_properties =
+  const vk::PhysicalDeviceProperties physical_device_properties =
       physical_device.getProperties();
 
   // The highest supported by both depth and color buffers.
-  vk::SampleCountFlags counts =
+  const vk::SampleCountFlags counts =
       physical_device_properties.limits.framebufferColorSampleCounts &
       physical_device_properties.limits.framebufferDepthSampleCounts;
   if (counts & vk::SampleCountFlagBits::e64) {
@@ -1221,11 +1234,16 @@ vk::SampleCountFlagBits VulkanIce::get_max_sample_count() {
   return vk::SampleCountFlagBits::e1;
 }
 
-void VulkanIce::destroy_swapchain_bundle(bool include_swapchain) {
-  for (auto frame : swapchain_frames) {
-    frame.destroy(imgui_command_pool);
+void VulkanIce::destroy_swapchain_bundle(bool include_swapchain) noexcept {
+  try {
+    for (auto frame : swapchain_frames) {
+      frame.destroy(imgui_command_pool);
+    }
+  } catch (const std::exception &e) {
+#ifndef NDEBUG
+    std::cerr << "Error while destroying swapchain bundle: " << e.what() << std::endl;
+#endif
   }
-
   if (include_swapchain) {
     device.destroySwapchainKHR(swapchain);
   }
@@ -1233,4 +1251,19 @@ void VulkanIce::destroy_swapchain_bundle(bool include_swapchain) {
   device.destroyDescriptorPool(frame_descriptor_pool);
 }
 
-} // namespace ice
+void VulkanIce::destroy_imgui_resources() noexcept {
+  device.destroyRenderPass(imgui_renderpass);
+  device.destroyCommandPool(imgui_command_pool);
+  try {
+    ImGui_ImplVulkan_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    device.destroyDescriptorPool(imgui_descriptor_pool);
+    ImGui::DestroyContext();
+  } catch (const std::exception &e) {
+#ifndef NDEBUG
+    std::cerr << "Error while destroying imgui resources: " << e.what() << std::endl;
+#endif
+  }
+}
+
+}  // namespace ice

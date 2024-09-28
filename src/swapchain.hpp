@@ -27,10 +27,10 @@ struct SwapChainFrame {
   vk::Image depth_buffer;
   vk::DeviceMemory depth_buffer_memory;
   vk::ImageView depth_buffer_view;
-  vk::Format depth_format;
+  vk::Format depth_format{vk::Format::eD32Sfloat};
 
   // color resources
-  vk::SampleCountFlagBits msaa_samples;
+  vk::SampleCountFlagBits msaa_samples{vk::SampleCountFlagBits::e1};
   vk::Image color_buffer;
   vk::DeviceMemory color_buffer_memory;
   vk::ImageView color_buffer_view;
@@ -45,19 +45,19 @@ struct SwapChainFrame {
   vk::Fence in_flight_fence;
 
   // frame resources
-  CameraMatrices camera_matrix_data;
+  CameraMatrices camera_matrix_data{};
   BufferBundle camera_matrix_buffer;
-  void *camera_matrix_write_location;
+  void *camera_matrix_write_location{};
 
-  vk::Format color_format;
+  vk::Format color_format{vk::Format::eB8G8R8A8Srgb};
 
-  CameraVectors camera_vector_data;
+  CameraVectors camera_vector_data{};
   BufferBundle camera_vector_buffer;
-  void *camera_vector_write_location;
+  void *camera_vector_write_location{};
 
   std::vector<glm::mat4> model_transforms;
   BufferBundle model_buffer;
-  void *model_buffer_write_location;
+  void *model_buffer_write_location{};
 
   // Resource Descriptors
   vk::DescriptorBufferInfo camera_vector_descriptor_info,
@@ -76,9 +76,9 @@ struct SwapChainFrame {
 
   void record_write_operations();
 
-  void write_descriptor_set();
+  void write_descriptor_set() const;
 
-  void destroy(vk::CommandPool imgui_command_pool);
+  void destroy(vk::CommandPool imgui_command_pool);  // noexcept;
 };
 
 // Bundles handles that would be created  with swapchain:
@@ -97,9 +97,8 @@ struct SwapChainSupportDetails {
   std::vector<vk::PresentModeKHR> present_modes;
 };
 
-inline SwapChainSupportDetails
-query_swapchain_support(const vk::PhysicalDevice &physical_device,
-                        const vk::SurfaceKHR &surface) {
+inline SwapChainSupportDetails query_swapchain_support(
+    const vk::PhysicalDevice &physical_device, const vk::SurfaceKHR &surface) {
   SwapChainSupportDetails details;
   details.capabilities = physical_device.getSurfaceCapabilitiesKHR(surface);
   details.formats = physical_device.getSurfaceFormatsKHR(surface);
@@ -111,7 +110,6 @@ query_swapchain_support(const vk::PhysicalDevice &physical_device,
 // choosers
 inline vk::SurfaceFormatKHR choose_swap_surface_format(
     const std::vector<vk::SurfaceFormatKHR> &available_formats) {
-
   for (const auto &available_format : available_formats) {
     if (available_format.format == vk::Format::eB8G8R8A8Srgb &&
         available_format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
@@ -123,39 +121,37 @@ inline vk::SurfaceFormatKHR choose_swap_surface_format(
   return available_formats[0];
 }
 
-inline vk::Extent2D
-choose_swap_extent(std::uint32_t width, std::uint32_t height,
-                   const vk::SurfaceCapabilitiesKHR &capabilities) {
+inline vk::Extent2D choose_swap_extent(
+    std::uint32_t width, std::uint32_t height,
+    const vk::SurfaceCapabilitiesKHR &capabilities) {
   // Some window managers set the currentExtent to maximum value of uint32_t
   // as a special case(else block)
   if (capabilities.currentExtent.width !=
       std::numeric_limits<std::uint32_t>::max()) {
     return capabilities.currentExtent;
-  } else { // Pick resolution that best matches window within minImageExtent
-           // and maxImageExtent in pixels
-
-    vk::Extent2D actual_extent = {static_cast<uint32_t>(width),
-                                  static_cast<uint32_t>(height)};
-
-    // Clamps values
-    actual_extent.width =
-        std::clamp(actual_extent.width, capabilities.minImageExtent.width,
-                   capabilities.maxImageExtent.width);
-    actual_extent.height =
-        std::clamp(actual_extent.height, capabilities.minImageExtent.height,
-                   capabilities.maxImageExtent.height);
-
-    return actual_extent;
   }
+  // Pick resolution that best matches window within minImageExtent and
+  // maxImageExtent in pixels
+
+  vk::Extent2D actual_extent = {static_cast<uint32_t>(width),
+                                static_cast<uint32_t>(height)};
+
+  // Clamps values
+  actual_extent.width =
+      std::clamp(actual_extent.width, capabilities.minImageExtent.width,
+                 capabilities.maxImageExtent.width);
+  actual_extent.height =
+      std::clamp(actual_extent.height, capabilities.minImageExtent.height,
+                 capabilities.maxImageExtent.height);
+
+  return actual_extent;
 }
 
-inline vk::PresentModeKHR
-choose_swap_present_mode(const std::vector<vk::PresentModeKHR> &present_modes) {
-
+inline vk::PresentModeKHR choose_swap_present_mode(
+    const std::vector<vk::PresentModeKHR> &present_modes) {
   for (const auto &present_mode : present_modes) {
-
     if (present_mode ==
-        vk::PresentModeKHR::eMailbox) { // aka Triple Buffering, low latency
+        vk::PresentModeKHR::eMailbox) {  // aka Triple Buffering, low latency
       return present_mode;
     }
   }
@@ -169,24 +165,23 @@ inline SwapChainBundle create_swapchain_bundle(
     vk::SurfaceKHR surface, int width, int height,
     vk::SwapchainKHR *old_swapchain = nullptr,
     vk::SampleCountFlagBits msaa_samples = vk::SampleCountFlagBits::e1) {
-
   // Get Swapchain support info
-  SwapChainSupportDetails swapchain_support =
+  const SwapChainSupportDetails swapchain_support =
       query_swapchain_support(physical_device, surface);
 
   // Choose surface formats
-  vk::SurfaceFormatKHR surface_format =
+  const vk::SurfaceFormatKHR surface_format =
       choose_swap_surface_format(swapchain_support.formats);
 
   // Choose presentation mode
-  vk::PresentModeKHR present_mode =
+  const vk::PresentModeKHR present_mode =
       choose_swap_present_mode(swapchain_support.present_modes);
 
   // Get Screen Extents (in pixels)
-  vk::Extent2D extent =
+  const vk::Extent2D extent =
       choose_swap_extent(width, height, swapchain_support.capabilities);
 
-  std::uint32_t image_count =
+  const std::uint32_t image_count =
       std::min(swapchain_support.capabilities.maxImageCount,
                swapchain_support.capabilities.minImageCount + 1);
 
@@ -206,14 +201,16 @@ inline SwapChainBundle create_swapchain_bundle(
                                                  : *old_swapchain,
   };
 
-  QueueFamilyIndices indices = find_queue_families(physical_device, surface);
-  std::uint32_t queue_family_indices[] = {indices.graphics_family.value(),
-                                          indices.present_family.value()};
+  const QueueFamilyIndices indices =
+      find_queue_families(physical_device, surface);
+  std::array<std::uint32_t, 2> queue_family_indices = {
+      indices.graphics_family.value_or(0), indices.present_family.value_or(0)};
 
   if (indices.graphics_family != indices.present_family) {
     swap_info.imageSharingMode = vk::SharingMode::eConcurrent;
-    swap_info.queueFamilyIndexCount = 2;
-    swap_info.pQueueFamilyIndices = queue_family_indices;
+    swap_info.queueFamilyIndexCount =
+        static_cast<std::uint32_t>(queue_family_indices.size());
+    swap_info.pQueueFamilyIndices = queue_family_indices.data();
   } else {
     swap_info.imageSharingMode = vk::SharingMode::eExclusive;
   }
@@ -253,6 +250,6 @@ inline SwapChainBundle create_swapchain_bundle(
 
   return bundle;
 }
-} // namespace ice
+}  // namespace ice
 
-#endif
+#endif  // SWAPCHAIN_HPP
