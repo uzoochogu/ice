@@ -8,31 +8,114 @@
 
 namespace ice {
 
-struct GraphicsPipelineInBundle {
-  vk::Device device;
-  std::optional<std::vector<vk::VertexInputAttributeDescription>>
-      attribute_descriptions;
-  std::optional<vk::VertexInputBindingDescription> binding_description;
-  std::string vertex_filepath;
-  std::string fragment_filepath;
-  vk::Extent2D swapchain_extent;
-  vk::Format swapchain_image_format;
-  std::optional<vk::Format> swapchain_depth_format;
-  std::vector<vk::DescriptorSetLayout> descriptor_set_layouts;
-  vk::AttachmentLoadOp load_op{vk::AttachmentLoadOp::eClear};
-  vk::ImageLayout initial_layout{vk::ImageLayout::eUndefined};
-  vk::SampleCountFlagBits msaa_samples{vk::SampleCountFlagBits::e1};
+enum ConfigFlags : uint32_t {
+  VERTEX_SHADER = 1u << 0,
+  FRAGMENT_SHADER = 1u << 1,
+  VERTEX_INPUT = 1u << 2,
+  INPUT_ASSEMBLY = 1u << 3,
+  VIEWPORT = 1u << 4,
+  SCISSOR = 1u << 5,
+  DYNAMIC_STATE = 1u << 6,
+  RASTERIZATION = 1u << 7,
+  MULTISAMPLE = 1u << 8,
+  DEPTH_STENCIL = 1u << 9,
+  COLOR_BLEND = 1u << 10,
+  PIPELINE_LAYOUT = 1u << 11,
+  RENDER_PASS = 1u << 12
 };
 
-struct GraphicsPipelineOutBundle {
-  vk::PipelineLayout layout;
-  vk::RenderPass renderpass;
-  vk::Pipeline pipeline;
+class GraphicsPipelineBuilder {
+ public:
+  explicit GraphicsPipelineBuilder(vk::Device device);
+  ~GraphicsPipelineBuilder();
+
+  // Reset the builder to its initial state
+  GraphicsPipelineBuilder& reset();
+
+  // Shader stage
+  GraphicsPipelineBuilder& set_vertex_shader(const std::string& filepath);
+  GraphicsPipelineBuilder& set_fragment_shader(const std::string& filepath);
+
+  // state setters
+  GraphicsPipelineBuilder& set_vertex_input_state() {
+    // empty vertex input state
+    config_flags_ |= ConfigFlags::VERTEX_INPUT;
+    return *this;
+  }
+  GraphicsPipelineBuilder& set_vertex_input_state(
+      const vk::VertexInputBindingDescription& binding_description,
+      const std::vector<vk::VertexInputAttributeDescription>&
+          attribute_descriptions);
+
+  GraphicsPipelineBuilder& set_input_assembly_state(
+      vk::PrimitiveTopology topology);
+
+  GraphicsPipelineBuilder& set_viewport(const vk::Viewport& viewport);
+  GraphicsPipelineBuilder& set_scissor(const vk::Rect2D& scissor);
+
+  GraphicsPipelineBuilder& set_rasterization_state(vk::PolygonMode polygon_mode,
+                                                   vk::CullModeFlags cull_mode,
+                                                   vk::FrontFace front_face);
+
+  GraphicsPipelineBuilder& set_multisample_state(
+      vk::SampleCountFlagBits samples);
+
+  GraphicsPipelineBuilder& enable_depth_test(bool depth_write_enable,
+                                             vk::CompareOp compare_op);
+  GraphicsPipelineBuilder& disable_depth_test();
+
+  GraphicsPipelineBuilder& set_color_blend_state(
+      const std::vector<vk::PipelineColorBlendAttachmentState>&
+          color_blend_attachments);
+  GraphicsPipelineBuilder& enable_alpha_blending();
+  GraphicsPipelineBuilder& disable_blending();
+
+  GraphicsPipelineBuilder& set_dynamic_state(
+      const std::vector<vk::DynamicState>& dynamic_states);
+
+  GraphicsPipelineBuilder& set_pipeline_layout(
+      vk::PipelineLayout pipeline_layout);
+
+  GraphicsPipelineBuilder& set_render_pass(vk::RenderPass render_pass,
+                                           uint32_t subpass = 0);
+
+  // Build the pipeline
+  vk::Pipeline build();
+
+ private:
+  std::uint32_t config_flags_ = 0;
+  static constexpr std::uint32_t REQUIRED_FLAGS =
+      (1u << 13) - 1;  // All flags set
+
+  vk::Device device_;
+
+  // Pipeline state
+  std::vector<vk::PipelineShaderStageCreateInfo> shader_stages_;
+  vk::PipelineVertexInputStateCreateInfo vertex_input_state_;
+  vk::PipelineInputAssemblyStateCreateInfo input_assembly_state_;
+  vk::PipelineViewportStateCreateInfo viewport_state_;
+  vk::PipelineRasterizationStateCreateInfo rasterization_state_;
+  vk::PipelineMultisampleStateCreateInfo multisample_state_;
+  vk::PipelineDepthStencilStateCreateInfo depth_stencil_state_;
+  vk::PipelineColorBlendStateCreateInfo color_blend_state_;
+
+  std::vector<vk::ShaderModule> shader_modules_;
+  std::vector<vk::PipelineColorBlendAttachmentState> color_blend_attachments_;
+
+  vk::PipelineDynamicStateCreateInfo dynamic_state_;
+  vk::PipelineLayout pipeline_layout_;
+  vk::RenderPass render_pass_;
+  uint32_t subpass_{};
+
+// Debug Util
+#ifndef NDEBUG
+  void print_missing_states() const;
+#endif
 };
 
 inline vk::PipelineLayout make_pipeline_layout(
-    const vk::Device &device,
-    const std::vector<vk::DescriptorSetLayout> &descriptor_set_layouts) {
+    const vk::Device& device,
+    const std::vector<vk::DescriptorSetLayout>& descriptor_set_layouts) {
 #ifndef NDEBUG
   std::cout << "Making pipeline layout" << std::endl;
 #endif
@@ -45,17 +128,17 @@ inline vk::PipelineLayout make_pipeline_layout(
 
   try {
     return device.createPipelineLayout(layout_info);
-  } catch (const vk::SystemError &err) {
+  } catch (const vk::SystemError& err) {
     throw std::runtime_error("Failed to create pipeline layout!");
   }
 }
 
 inline vk::RenderPass make_imgui_renderpass(
-    const vk::Device &device, const vk::Format &swapchain_image_format,
+    const vk::Device& device, const vk::Format& swapchain_image_format,
     vk::AttachmentLoadOp load_op = vk::AttachmentLoadOp::eLoad,
     vk::ImageLayout initial_layout = vk::ImageLayout::eColorAttachmentOptimal) {
 #ifndef NDEBUG
-  std::cout << "Making ImGui Renderpass" << std::endl;
+  std::cout << "\nMaking ImGui Renderpass" << std::endl;
 #endif
 
   const vk::AttachmentDescription color_attachment = {
@@ -96,13 +179,13 @@ inline vk::RenderPass make_imgui_renderpass(
 
   try {
     return device.createRenderPass(renderpass_info);
-  } catch (const vk::SystemError &err) {
+  } catch (const vk::SystemError& err) {
     throw std::runtime_error("Failed to create ImGui renderpass!");
   }
 }
 
 inline vk::RenderPass make_scene_renderpass(
-    const vk::Device &device, const vk::Format swapchain_image_format,
+    const vk::Device& device, const vk::Format swapchain_image_format,
     const vk::Format swapchain_depth_format, vk::AttachmentLoadOp load_op,
     vk::ImageLayout initial_layout, vk::SampleCountFlagBits msaa_samples) {
 #ifndef NDEBUG
@@ -153,7 +236,7 @@ inline vk::RenderPass make_scene_renderpass(
 
 #ifndef NDEBUG
   std::cout << "Attachments:\n";
-  for (int index{0}; const auto &attachment : attachments) {
+  for (int index{0}; const auto& attachment : attachments) {
     std::cout << std::format("Attachment {}  \n", index);
 
     std::cout << std::format(
@@ -193,6 +276,11 @@ inline vk::RenderPass make_scene_renderpass(
       "Attachments      : {}\n"
       "Attachments Refs : {}\n\n",
       attachments.size(), color_attachment_refs.size());
+  std::cout << std::format(
+      "Renderpass Details\n"
+      "Attachments      : {}\n"
+      "Attachments Refs : {}\n\n",
+      attachments.size(), color_attachment_refs.size());
 
 #endif
 
@@ -208,7 +296,7 @@ inline vk::RenderPass make_scene_renderpass(
 }
 
 inline vk::RenderPass make_sky_renderpass(
-    const vk::Device &device, const vk::Format swapchain_image_format,
+    const vk::Device& device, const vk::Format swapchain_image_format,
     vk::AttachmentLoadOp load_op = vk::AttachmentLoadOp::eDontCare,
     vk::ImageLayout initial_layout = vk::ImageLayout::eUndefined,
     vk::SampleCountFlagBits msaa_samples = vk::SampleCountFlagBits::e1) {
@@ -243,6 +331,17 @@ inline vk::RenderPass make_sky_renderpass(
       vk::to_string(color_attachment.loadOp),
       vk::to_string(color_attachment.storeOp),
       vk::to_string(color_attachment.samples));
+  std::cout << std::format(
+      "Initial layout : {}\n"
+      "Final   layout : {}\n"
+      "loadOp         : {}\n"
+      "StoreOp        : {}\n"
+      "MSAA samples   : {}\n",
+      vk::to_string(color_attachment.initialLayout),
+      vk::to_string(color_attachment.finalLayout),
+      vk::to_string(color_attachment.loadOp),
+      vk::to_string(color_attachment.storeOp),
+      vk::to_string(color_attachment.samples));
 #endif
 
   attachments.push_back(color_attachment);
@@ -264,6 +363,11 @@ inline vk::RenderPass make_sky_renderpass(
       "Attachments      : {}\n"
       "Attachments Refs : {}\n\n",
       attachments.size(), color_attachment_refs.size());
+  std::cout << std::format(
+      "Renderpass Details\n"
+      "Attachments      : {}\n"
+      "Attachments Refs : {}\n\n",
+      attachments.size(), color_attachment_refs.size());
 #endif
 
   const vk::RenderPassCreateInfo renderpass_info{
@@ -273,183 +377,9 @@ inline vk::RenderPass make_sky_renderpass(
       .pSubpasses = &subpass};
   try {
     return device.createRenderPass(renderpass_info);
-  } catch (const vk::SystemError &err) {
+  } catch (const vk::SystemError& err) {
     throw std::runtime_error("Failed to create renderpass!");
   }
 }
-
-inline GraphicsPipelineOutBundle make_graphics_pipeline(
-    const GraphicsPipelineInBundle &specification) {
-#ifndef NDEBUG
-  std::cout << "Making Graphics pipeline" << std::endl;
-#endif
-  // Will be filled after creation of each stage
-  vk::GraphicsPipelineCreateInfo pipeline_info{.flags =
-                                                   vk::PipelineCreateFlags()};
-
-  // Vertex input
-  // Get vertex data binding descriptions
-  const bool vertex_attributes_present =
-      specification.attribute_descriptions.has_value();
-  const bool vertex_bindings_present =
-      specification.binding_description.has_value();
-
-  vk::PipelineVertexInputStateCreateInfo vertex_input_info{};
-  if (vertex_attributes_present && vertex_bindings_present) {
-    vertex_input_info = {
-        .flags = vk::PipelineVertexInputStateCreateFlags(),
-        .vertexBindingDescriptionCount = 1,
-        .pVertexBindingDescriptions =
-            &specification.binding_description.value(),
-        .vertexAttributeDescriptionCount = static_cast<std::uint32_t>(
-            specification.attribute_descriptions.value().size()),
-        .pVertexAttributeDescriptions =
-            specification.attribute_descriptions.value().data()};
-  }
-  pipeline_info.pVertexInputState = &vertex_input_info;
-
-  // Input Assembly
-  const vk::PipelineInputAssemblyStateCreateInfo input_assembly_info = {
-      .topology = vk::PrimitiveTopology::eTriangleList,
-      .primitiveRestartEnable = vk::False,
-  };
-  pipeline_info.pInputAssemblyState = &input_assembly_info;
-
-// Vertex Shader
-#ifndef NDEBUG
-  std::cout << "Vertex Shader creation" << std::endl;
-#endif
-  const vk::ShaderModule vertex_shader =
-      create_shader_module(specification.vertex_filepath, specification.device);
-  const vk::PipelineShaderStageCreateInfo vertex_shader_info = {
-      .stage = vk::ShaderStageFlagBits::eVertex,
-      .module = vertex_shader,
-      .pName = "main"};
-
-  // Viewport and Scissor
-  // Dynamic states to be modified in command buffer - at drawing time
-  std::vector<vk::DynamicState> dynamic_states = {vk::DynamicState::eViewport,
-                                                  vk::DynamicState::eScissor};
-  const vk::PipelineDynamicStateCreateInfo dynamic_state_info{
-      .dynamicStateCount = static_cast<uint32_t>(dynamic_states.size()),
-      .pDynamicStates = dynamic_states.data()};
-
-  const vk::PipelineViewportStateCreateInfo viewport_state{.viewportCount = 1,
-                                                           .scissorCount = 1};
-  pipeline_info.pDynamicState = &dynamic_state_info;
-  pipeline_info.pViewportState = &viewport_state;
-
-  // Rasterizer
-  const vk::PipelineRasterizationStateCreateInfo rasterizer_info{
-      .depthClampEnable = vk::False,
-      .rasterizerDiscardEnable = vk::False,
-      .polygonMode = vk::PolygonMode::eFill,
-      .cullMode = vk::CullModeFlagBits::eBack,
-      .frontFace = vk::FrontFace::eCounterClockwise, /* eClockwise*/
-      .depthBiasEnable = vk::False,
-      .depthBiasConstantFactor = 0.0f,
-      .depthBiasClamp = 0.0f,
-      .depthBiasSlopeFactor = 0.0f,
-      .lineWidth = 1.0f,
-  };
-  pipeline_info.pRasterizationState = &rasterizer_info;
-
-// fragment shader
-#ifndef NDEBUG
-  std::cout << "Fragment Shader creation" << std::endl;
-#endif
-  const vk::ShaderModule fragment_shader = create_shader_module(
-      specification.fragment_filepath, specification.device);
-  const vk::PipelineShaderStageCreateInfo fragment_shader_info = {
-      .stage = vk::ShaderStageFlagBits::eFragment,
-      .module = fragment_shader,
-      .pName = "main"};
-  // submit all shader stages
-  std::array<vk::PipelineShaderStageCreateInfo, 2> shader_stages = {
-      vertex_shader_info, fragment_shader_info};
-  pipeline_info.stageCount = static_cast<uint32_t>(shader_stages.size());
-  pipeline_info.pStages = shader_stages.data();
-
-  // multisampling
-  const vk::PipelineMultisampleStateCreateInfo multisamping_info{
-      .rasterizationSamples = specification.msaa_samples,
-      .sampleShadingEnable =
-          vk::True,  // improves image quality, performance cost
-      .minSampleShading =
-          .2f  // Min fraction for sample shading: closer to 1 is smoother
-  };
-  pipeline_info.pMultisampleState = &multisamping_info;
-
-  // Color blend
-  const vk::PipelineColorBlendAttachmentState color_blend_attachment{
-      .blendEnable = vk::False,
-      .colorWriteMask =
-          vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-          vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA,
-  };
-  const vk::PipelineColorBlendStateCreateInfo color_blending_info = {
-      .flags = vk::PipelineColorBlendStateCreateFlags(),
-      .logicOpEnable = vk::False,
-      .logicOp = vk::LogicOp::eCopy,
-      .attachmentCount = 1,
-      .pAttachments = &color_blend_attachment,
-      .blendConstants = std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f}};
-
-  pipeline_info.pColorBlendState = &color_blending_info;
-
-  // depth stencil
-  const vk::PipelineDepthStencilStateCreateInfo depth_stencil_info{
-      .depthTestEnable = vk::True,
-      .depthWriteEnable = vk::True,
-      .depthCompareOp = vk::CompareOp::eLess,
-      .depthBoundsTestEnable = vk::False,
-      .stencilTestEnable = vk::False,
-  };
-  pipeline_info.pDepthStencilState = &depth_stencil_info;
-
-  // Pipeline layout
-  const vk::PipelineLayout pipeline_layout = make_pipeline_layout(
-      specification.device, specification.descriptor_set_layouts);
-  pipeline_info.layout = pipeline_layout;
-
-  // choose which renderpass to make
-  const vk::RenderPass renderpass =
-      specification.swapchain_depth_format.has_value()
-          ? make_scene_renderpass(
-                specification.device, specification.swapchain_image_format,
-                specification.swapchain_depth_format.value(),
-                specification.load_op, specification.initial_layout,
-                specification.msaa_samples)
-          : make_sky_renderpass(
-                specification.device, specification.swapchain_image_format,
-                specification.load_op, specification.initial_layout,
-                specification.msaa_samples);
-
-  pipeline_info.renderPass = renderpass;
-  pipeline_info.subpass = 0;
-
-  pipeline_info.basePipelineHandle = nullptr;  // no derivatives
-
-  const vk::Pipeline graphics_pipeline =
-      specification.device.createGraphicsPipeline(nullptr, pipeline_info).value;
-  if (graphics_pipeline == nullptr) {
-#ifndef NDEBUG
-    std::cerr << "Failed to create Pipeline" << std::endl;
-#endif
-    throw std::runtime_error("Failed to create Pipeline");
-  }
-
-  GraphicsPipelineOutBundle output{.layout = pipeline_layout,
-                                   .renderpass = renderpass,
-                                   .pipeline = graphics_pipeline};
-
-  // clean shader modules
-  specification.device.destroyShaderModule(vertex_shader);
-  specification.device.destroyShaderModule(fragment_shader);
-
-  return output;
-}
-
 }  // namespace ice
-
-#endif  // ICE_PIPELINE_HPP
+#endif  // PIPELINE_HPP

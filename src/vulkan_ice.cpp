@@ -135,7 +135,6 @@ void VulkanIce::make_instance() {
 #endif
 
   vk::InstanceCreateInfo create_info{
-      /* .flags = vk::InstanceCreateFlags(), */
       .pApplicationInfo = &app_info,
       .enabledExtensionCount = static_cast<uint32_t>(extensions.size()),
       .ppEnabledExtensionNames = extensions.data()};
@@ -342,46 +341,75 @@ void VulkanIce::setup_imgui_overlay() {
 }
 
 void VulkanIce::setup_pipeline_bundles() {
+  ice::GraphicsPipelineBuilder builder(device);
+
   // SKY PIPELINE
-  // load and store op is don't care, will present.
-  GraphicsPipelineInBundle spec{
-      .device = device,
-      .vertex_filepath = "resources/shaders/sky_vert.spv",
-      .fragment_filepath = "resources/shaders/sky_frag.spv",
-      .swapchain_extent = swapchain_extent,
-      .swapchain_image_format = swapchain_format,
-      .descriptor_set_layouts = {frame_set_layout[PipelineType::SKY],
-                                 mesh_set_layout[PipelineType::SKY]},
-      .load_op = vk::AttachmentLoadOp::eDontCare,
-      .initial_layout = vk::ImageLayout::eUndefined,
-      .msaa_samples = msaa_samples};
+  renderpass[PipelineType::SKY] = make_sky_renderpass(
+      device, swapchain_format, vk::AttachmentLoadOp::eDontCare,
+      vk::ImageLayout::eUndefined, msaa_samples);
 
-  GraphicsPipelineOutBundle graphics_bundle = make_graphics_pipeline(spec);
+  pipeline_layout[PipelineType::SKY] =
+      make_pipeline_layout(device, {frame_set_layout[PipelineType::SKY],
+                                    mesh_set_layout[PipelineType::SKY]});
 
-  pipeline_layout[PipelineType::SKY] = graphics_bundle.layout;
-  renderpass[PipelineType::SKY] = graphics_bundle.renderpass;
-  pipeline[PipelineType::SKY] = graphics_bundle.pipeline;
+  const vk::Pipeline sky_pipeline =
+      builder.reset()
+          .set_vertex_shader("resources/shaders/sky_vert.spv")
+          .set_fragment_shader("resources/shaders/sky_frag.spv")
+          .set_vertex_input_state()  // empty input state
+          .set_input_assembly_state(vk::PrimitiveTopology::eTriangleList)
+          .set_viewport({.x = 0.0f,
+                         .y = 0.0f,
+                         .width = static_cast<float>(swapchain_extent.width),
+                         .height = static_cast<float>(swapchain_extent.height),
+                         .minDepth = 0.0f,
+                         .maxDepth = 1.0f})
+          .set_scissor(vk::Rect2D({0, 0}, swapchain_extent))
+          .set_rasterization_state(vk::PolygonMode::eFill,
+                                   vk::CullModeFlagBits::eBack,
+                                   vk::FrontFace::eCounterClockwise)
+          .set_multisample_state(msaa_samples)
+          .disable_depth_test()
+          .disable_blending()
+          .set_dynamic_state(
+              {vk::DynamicState::eViewport, vk::DynamicState::eScissor})
+          .set_pipeline_layout(pipeline_layout[PipelineType::SKY])
+          .set_render_pass(renderpass[PipelineType::SKY])
+          .build();
+  pipeline[PipelineType::SKY] = sky_pipeline;
 
   // STANDARD PIPELINE
-  spec.vertex_filepath = "resources/shaders/vert.spv";
-  spec.fragment_filepath = "resources/shaders/frag.spv";
-  spec.attribute_descriptions = Vertex::get_attribute_descriptions();
-  spec.binding_description = Vertex::get_binding_description();
-  spec.swapchain_depth_format =
-      swapchain_frames[0].depth_format /* at least 1 is guaranteed*/;
-  spec.descriptor_set_layouts = {frame_set_layout[PipelineType::STANDARD],
-                                 mesh_set_layout[PipelineType::STANDARD]};
-  spec.load_op = vk::AttachmentLoadOp::eLoad;
-  spec.initial_layout = vk::ImageLayout::eColorAttachmentOptimal;
-  spec.msaa_samples = msaa_samples;
+  renderpass[PipelineType::STANDARD] = make_scene_renderpass(
+      device, swapchain_format, swapchain_frames[0].depth_format,
+      vk::AttachmentLoadOp::eLoad, vk::ImageLayout::eColorAttachmentOptimal,
+      msaa_samples);
+  pipeline_layout[PipelineType::STANDARD] =
+      make_pipeline_layout(device, {frame_set_layout[PipelineType::STANDARD],
+                                    mesh_set_layout[PipelineType::STANDARD]});
+  const vk::Pipeline standard_pipeline =
+      builder.reset()
+          .set_vertex_shader("resources/shaders/vert.spv")
+          .set_fragment_shader("resources/shaders/frag.spv")
+          .set_vertex_input_state(Vertex::get_binding_description(),
+                                  Vertex::get_attribute_descriptions())
+          .set_input_assembly_state(vk::PrimitiveTopology::eTriangleList)
+          .set_viewport({0.0f, 0.0f, static_cast<float>(swapchain_extent.width),
+                         static_cast<float>(swapchain_extent.height), 0.0f,
+                         1.0f})
+          .set_scissor(vk::Rect2D({0, 0}, swapchain_extent))
+          .set_rasterization_state(vk::PolygonMode::eFill,
+                                   vk::CullModeFlagBits::eBack,
+                                   vk::FrontFace::eCounterClockwise)
+          .set_multisample_state(msaa_samples)
+          .enable_depth_test(true, vk::CompareOp::eLess)
+          .disable_blending()
+          .set_dynamic_state(
+              {vk::DynamicState::eViewport, vk::DynamicState::eScissor})
+          .set_pipeline_layout(pipeline_layout[PipelineType::STANDARD])
+          .set_render_pass(renderpass[PipelineType::STANDARD])
+          .build();
+  pipeline[PipelineType::STANDARD] = standard_pipeline;
 
-  graphics_bundle = make_graphics_pipeline(spec);
-
-  pipeline_layout[PipelineType::STANDARD] = graphics_bundle.layout;
-  renderpass[PipelineType::STANDARD] = graphics_bundle.renderpass;
-  pipeline[PipelineType::STANDARD] = graphics_bundle.pipeline;
-
-  // imgui renderpass
   imgui_renderpass = make_imgui_renderpass(device, swapchain_format);
 }
 
@@ -393,7 +421,8 @@ void VulkanIce::setup_framebuffers() {
       .imgui_renderpass = imgui_renderpass,
       .swapchain_extent = swapchain_extent};
 
-  // populate frame buffers (including imgui's), one for each swapchain image.
+  // populate frame buffers (including imgui's), one for each
+  // swapchain image.
   make_framebuffers(framebuffer_input, swapchain_frames);
 }
 
@@ -479,8 +508,8 @@ void VulkanIce::recreate_swapchain() {
 
   setup_framebuffers();
   setup_frame_resources();
-  // just setup frame command buffers, since pool and main buffer is already
-  // created
+  // just setup frame command buffers, since pool and main buffer
+  // is already created
   CommandBufferReq command_buffer_req = {.device = device,
                                          .command_pool = command_pool,
                                          .frames = swapchain_frames};
@@ -526,12 +555,6 @@ void VulkanIce::make_assets() {
           {MeshTypes::SKULL,
            {"resources/models/skull.obj", "resources/models/skull.mtl"},
            glm::mat4(1.0f)}};
-
-  /*   //  pair
-    for (const auto &[mesh_types, filenames, pre_transform] : model_inputs) {
-      ObjMesh model(filenames[0], filenames[1], pre_transform);
-      meshes->consume(mesh_types, model.vertices, model.indices);
-    } */
 
   // stores models to be loaded
   std::unordered_map<MeshTypes, ObjMesh> models;
@@ -671,9 +694,9 @@ void VulkanIce::make_assets() {
       physical_device, device, main_command_buffer, graphics_queue,
       mesh_set_layout[PipelineType::STANDARD], gltf_descriptor_pool,
       // "resources/models/Box.gltf", pre_transform);
-      // "resources/models/ToyCar.glb", pre_transform); // very tiny increase
-      // scale to see it
-      // "resources/models/Suzanne.gltf", pre_transform);
+      // "resources/models/ToyCar.glb", pre_transform); // very tiny
+      // increase scale to see it "resources/models/Suzanne.gltf",
+      // pre_transform);
       "resources/models/DamagedHelmet.gltf", pre_transform);
 
 #ifndef NDEBUG
@@ -1241,7 +1264,8 @@ void VulkanIce::destroy_swapchain_bundle(bool include_swapchain) noexcept {
     }
   } catch (const std::exception &e) {
 #ifndef NDEBUG
-    std::cerr << "Error while destroying swapchain bundle: " << e.what() << std::endl;
+    std::cerr << "Error while destroying swapchain bundle: " << e.what()
+              << std::endl;
 #endif
   }
   if (include_swapchain) {
@@ -1261,7 +1285,8 @@ void VulkanIce::destroy_imgui_resources() noexcept {
     ImGui::DestroyContext();
   } catch (const std::exception &e) {
 #ifndef NDEBUG
-    std::cerr << "Error while destroying imgui resources: " << e.what() << std::endl;
+    std::cerr << "Error while destroying imgui resources: " << e.what()
+              << std::endl;
 #endif
   }
 }
