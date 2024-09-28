@@ -9,21 +9,20 @@ namespace ice_image {
 inline const constexpr int FACES_IN_CUBE = 6;
 
 class CubeMap {
+ public:
+  explicit CubeMap(const TextureCreationInput &input);
 
-public:
-  CubeMap(const TextureCreationInput &input);
-
-  void use(vk::CommandBuffer command_buffer,
+  void use(vk::CommandBuffer recording_command_buffer,
            vk::PipelineLayout pipeline_layout);
 
   ~CubeMap();
 
-private:
-  int width, height, channels;
+ private:
+  int width{}, height{}, channels{};
   vk::Device logical_device;
   vk::PhysicalDevice physical_device;
   std::vector<std::string> filenames;
-  stbi_uc *pixels[FACES_IN_CUBE];
+  stbi_uc *pixels[FACES_IN_CUBE] = {};  // NOLINT (modernize-avoid-c-arrays)
 
   // Resources
   vk::Image image;
@@ -66,6 +65,6 @@ private:
   void make_descriptor_set();
 };
 
-} // namespace ice_image
+}  // namespace ice_image
 
-#endif
+#endif  // ICE_CUBE_MAP_HPP

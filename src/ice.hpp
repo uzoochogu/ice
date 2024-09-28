@@ -6,24 +6,22 @@
 
 namespace ice {
 class Ice {
-public:
+ public:
   Ice() = default;
-  ~Ice();
+  ~Ice() = default;
   void run();
   void calculate_frame_rate();
 
-private:
-  void apply_imgui_theme();
-  double last_time, current_time;
-  int num_frames;
-  float frame_time;
+ private:
+  static void apply_imgui_theme();
+  double last_time{}, current_time{};
+  int num_frames{};
+  float frame_time{};
   Scene scene;
 
-  static constexpr int width{800};
-  static constexpr int height{600};
-  IceWindow window{width, height, "Ice engine!"};
+  IceWindow window{800, 600, "Ice engine!"};
   VulkanIce vulkan_backend{window};
 };
-} // namespace ice
+}  // namespace ice
 
-#endif
+#endif  // ICE_HPP

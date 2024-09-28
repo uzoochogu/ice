@@ -8,12 +8,12 @@
 
 namespace ice_image {
 vk::Image make_image(const ImageCreationInput &input) {
-  vk::ImageCreateInfo image_info{
+  const vk::ImageCreateInfo image_info{
       .flags = vk::ImageCreateFlagBits() | input.create_flags,
 
       .imageType = vk::ImageType::e2D,
       .format = input.format,
-      .extent = vk::Extent3D(input.width, input.height, 1),
+      .extent = {input.width, input.height, 1},
 
       .mipLevels = input.mip_levels,
       .arrayLayers = input.array_count,
@@ -29,7 +29,7 @@ vk::Image make_image(const ImageCreationInput &input) {
   vk::Image image;
   try {
     image = input.logical_device.createImage(image_info);
-  } catch (vk::SystemError err) {
+  } catch (const vk::SystemError &err) {
     std::cout << "Unable to make image";
   }
   return image;
@@ -42,12 +42,13 @@ vk::DeviceMemory make_image_memory(const ImageCreationInput &input,
 
 #ifndef NDEBUG
   std::cout << "\nImage memory Requirements\n";
-  std::cout << std::format("Required size:             {}\n"
-                           "Required memory type bit:  {}\n",
-                           requirements.size, requirements.memoryTypeBits);
+  std::cout << std::format(
+      "Required size:             {}\n"
+      "Required memory type bit:  {}\n",
+      requirements.size, requirements.memoryTypeBits);
 #endif
 
-  vk::MemoryAllocateInfo allocation{
+  const vk::MemoryAllocateInfo allocation{
       .allocationSize = requirements.size,
       .memoryTypeIndex = ice::find_memory_type_index(
           input.physical_device, requirements.memoryTypeBits,
@@ -57,8 +58,7 @@ vk::DeviceMemory make_image_memory(const ImageCreationInput &input,
   try {
     image_memory = input.logical_device.allocateMemory(allocation);
     input.logical_device.bindImageMemory(image, image_memory, 0);
-
-  } catch (vk::SystemError err) {
+  } catch (const vk::SystemError &err) {
     std::cout << "Unable to allocate memory for image";
     throw err;
   }
@@ -70,15 +70,14 @@ vk::DeviceMemory make_image_memory(const ImageCreationInput &input,
 }
 
 void transition_image_layout(ImageLayoutTransitionJob transition_job) {
-
   ice::start_job(transition_job.command_buffer);
 
-  vk::ImageSubresourceRange access{.aspectMask =
-                                       vk::ImageAspectFlagBits::eColor,
-                                   .baseMipLevel = 0,
-                                   .levelCount = transition_job.mip_levels,
-                                   .baseArrayLayer = 0,
-                                   .layerCount = transition_job.array_count};
+  const vk::ImageSubresourceRange access{
+      .aspectMask = vk::ImageAspectFlagBits::eColor,
+      .baseMipLevel = 0,
+      .levelCount = transition_job.mip_levels,
+      .baseArrayLayer = 0,
+      .layerCount = transition_job.array_count};
 
   vk::ImageMemoryBarrier barrier{.oldLayout = transition_job.old_layout,
                                  .newLayout = transition_job.new_layout,
@@ -91,14 +90,12 @@ void transition_image_layout(ImageLayoutTransitionJob transition_job) {
 
   if (transition_job.old_layout == vk::ImageLayout::eUndefined &&
       transition_job.new_layout == vk::ImageLayout::eTransferDstOptimal) {
-
     barrier.srcAccessMask = vk::AccessFlagBits::eNoneKHR;
     barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
 
     source_stage = vk::PipelineStageFlagBits::eTopOfPipe;
     destination_stage = vk::PipelineStageFlagBits::eTransfer;
   } else {
-
     barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
     barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
 
@@ -114,17 +111,17 @@ void transition_image_layout(ImageLayoutTransitionJob transition_job) {
 }
 
 void copy_buffer_to_image(const BufferImageCopyJob &copy_job) {
-
   ice::start_job(copy_job.command_buffer);
 
   vk::BufferImageCopy copy{
       .bufferOffset = 0,
       .bufferRowLength = 0,
       .bufferImageHeight = 0,
-      .imageOffset = vk::Offset3D(0, 0, 0),
-      .imageExtent = vk::Extent3D(copy_job.width, copy_job.height, 1)};
+      .imageOffset = {.x = 0, .y = 0, .z = 0},
+      .imageExtent = {static_cast<uint32_t>(copy_job.width),
+                      static_cast<uint32_t>(copy_job.height), 1}};
 
-  vk::ImageSubresourceLayers access{
+  const vk::ImageSubresourceLayers access{
       .aspectMask = vk::ImageAspectFlagBits::eColor,
       .mipLevel = 0,
       .baseArrayLayer = 0,
@@ -145,7 +142,7 @@ vk::ImageView make_image_view(vk::Device logical_device, vk::Image image,
                               vk::ImageViewType view_type,
                               std::uint32_t array_count,
                               std::uint32_t mip_levels) {
-  vk::ImageViewCreateInfo create_info = {
+  const vk::ImageViewCreateInfo create_info = {
       .image = image,
       .viewType = view_type,
       .format = format,
@@ -172,9 +169,8 @@ vk::Format find_supported_format(vk::PhysicalDevice physical_device,
                                  const std::vector<vk::Format> &candidates,
                                  vk::ImageTiling tiling,
                                  vk::FormatFeatureFlags features) {
-  for (vk::Format format : candidates) {
-
-    vk::FormatProperties properties =
+  for (const vk::Format format : candidates) {
+    const vk::FormatProperties properties =
         physical_device.getFormatProperties(format);
 
     if (tiling == vk::ImageTiling::eLinear &&
@@ -193,11 +189,10 @@ vk::Format find_supported_format(vk::PhysicalDevice physical_device,
 void generate_mipmaps(vk::PhysicalDevice physical_device,
                       vk::CommandBuffer command_buffer, vk::Image image,
                       vk::Queue graphics_queue, vk::Format image_format,
-                      uint32_t tex_width, uint32_t tex_height,
+                      std::uint32_t tex_width, std::uint32_t tex_height,
                       std::uint32_t mip_levels) {
-
   // Check if image format support linear blitting
-  vk::FormatProperties format_properties =
+  const vk::FormatProperties format_properties =
       physical_device.getFormatProperties(image_format);
 
   if (!(format_properties.optimalTilingFeatures &
@@ -211,7 +206,6 @@ void generate_mipmaps(vk::PhysicalDevice physical_device,
 
   // reused for the several transitions
   vk::ImageMemoryBarrier barrier{
-
       .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
       .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
       .image = image,
@@ -220,8 +214,8 @@ void generate_mipmaps(vk::PhysicalDevice physical_device,
                            .baseArrayLayer = 0,
                            .layerCount = 1}};
 
-  std::int32_t mip_width = tex_width;
-  std::int32_t mip_height = tex_height;
+  auto mip_width = static_cast<int32_t>(tex_width);
+  auto mip_height = static_cast<int32_t>(tex_height);
 
   for (std::uint32_t i = 1; i < mip_levels; i++) {
     // transition level i - 1 to TRANSFER_SRC_OPTIMAL.
@@ -229,7 +223,7 @@ void generate_mipmaps(vk::PhysicalDevice physical_device,
     // previous blit command or from vkCmdCopyBufferToImage.
     // The current blit command will wait on this transition
     barrier.subresourceRange.baseMipLevel = i - 1;
-    barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal; // eUndefined
+    barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;  // eUndefined
     barrier.newLayout = vk::ImageLayout::eTransferSrcOptimal;
     barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
     barrier.dstAccessMask = vk::AccessFlagBits::eTransferRead;
@@ -284,16 +278,14 @@ void generate_mipmaps(vk::PhysicalDevice physical_device,
                                    nullptr, 1, &barrier);
 
     // ensure it can never become 0 especially for non-square images
-    if (mip_width > 1)
-      mip_width /= 2;
-    if (mip_height > 1)
-      mip_height /= 2;
+    if (mip_width > 1) mip_width /= 2;
+    if (mip_height > 1) mip_height /= 2;
   }
 
   // transition the last mip level from TransferDstOptimal to
   // ShaderReadOnlyOptimal.
   barrier.subresourceRange.baseMipLevel = mip_levels - 1;
-  barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal; // eUndefined
+  barrier.oldLayout = vk::ImageLayout::eTransferDstOptimal;  // eUndefined
   barrier.newLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
   barrier.srcAccessMask = vk::AccessFlagBits::eTransferRead;
   barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
@@ -306,4 +298,4 @@ void generate_mipmaps(vk::PhysicalDevice physical_device,
   ice::end_job(command_buffer, graphics_queue);
 }
 
-} // namespace ice_image
+}  // namespace ice_image

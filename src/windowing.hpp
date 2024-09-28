@@ -13,7 +13,7 @@ inline void create_surface(VkInstance instance, GLFWwindow *window,
                            VkSurfaceKHR *surface) {
   // VkInstance, GLFW window pointer, custom allocator and pointer to
   // VkSurfaceKHR
-  if (glfwCreateWindowSurface(instance, window, nullptr, surface) !=
+  if (glfwCreateWindowSurface(instance, window, allocator, surface) !=
       VK_SUCCESS) {
     throw std::runtime_error("failed to create window surface!");
   }
@@ -25,35 +25,35 @@ struct Window2D {
 };
 // @brief Abstracts windowing functionalities.
 class IceWindow {
-public:
+ public:
   IceWindow(int width, int height, std::string name);
   ~IceWindow();
 
   // Windowing API adaptors
-  GLFWwindow *get_window() const { return window; }
+  [[nodiscard]] GLFWwindow *get_window() const { return window; }
   bool should_close() { return glfwWindowShouldClose(window); }
 
-  void poll_events() { glfwPollEvents(); }
+  static void poll_events() { glfwPollEvents(); }
 
-  double get_time() { return glfwGetTime(); }
+  static double get_time() { return glfwGetTime(); }
 
   void set_window_title(std::string title) {
     glfwSetWindowTitle(window, title.data());
   }
 
-  std::vector<const char *> get_required_extensions() const;
+  static std::vector<const char *> get_required_extensions();
 
-  Window2D get_framebuffer_size() const;
-  void wait_events() const;
+  [[nodiscard]] Window2D get_framebuffer_size() const;
+  static void wait_events();
 
-  int width;
-  int height;
+  int width{};
+  int height{};
 
-private:
+ private:
   std::string window_name;
   GLFWwindow *window;
 };
 
-} // namespace ice
+}  // namespace ice
 
-#endif
+#endif  // ICE_WINDOW_HPP

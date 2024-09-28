@@ -1,8 +1,9 @@
 #ifndef ICE_IMAGE_HPP
 #define ICE_IMAGE_HPP
 
-#include "../config.hpp"
 #include <stb_image.h>
+
+#include "../config.hpp"
 
 namespace ice_image {
 
@@ -37,7 +38,7 @@ struct ImageLayoutTransitionJob {
   vk::CommandBuffer command_buffer;
   vk::Queue queue;
   vk::Image image;
-  vk::ImageLayout old_layout, new_layout;
+  vk::ImageLayout old_layout{}, new_layout{};
   std::uint32_t array_count{1};
   std::uint32_t mip_levels{1};
 };
@@ -48,7 +49,7 @@ struct BufferImageCopyJob {
   vk::Queue queue;
   vk::Buffer src_buffer;
   vk::Image dst_image;
-  int width, height;
+  int width{}, height{};
   std::uint32_t array_count{1};
 };
 
@@ -77,11 +78,11 @@ void transition_image_layout(ImageLayoutTransitionJob transition_job);
 void copy_buffer_to_image(const BufferImageCopyJob &copy_job);
 
 // Create a view of a vulkan image.
-vk::ImageView
-make_image_view(vk::Device logical_device, vk::Image image, vk::Format format,
-                vk::ImageAspectFlags aspect,
-                vk::ImageViewType view_type = vk::ImageViewType::e2D,
-                std::uint32_t array_count = 1, std::uint32_t mip_levels = 1);
+vk::ImageView make_image_view(
+    vk::Device logical_device, vk::Image image, vk::Format format,
+    vk::ImageAspectFlags aspect,
+    vk::ImageViewType view_type = vk::ImageViewType::e2D,
+    std::uint32_t array_count = 1, std::uint32_t mip_levels = 1);
 
 vk::Format find_supported_format(vk::PhysicalDevice physical_device,
                                  const std::vector<vk::Format> &candidates,
@@ -102,6 +103,6 @@ void generate_mipmaps(vk::PhysicalDevice physical_device,
                       uint32_t tex_width, uint32_t tex_height,
                       std::uint32_t mip_levels);
 
-} // namespace ice_image
+}  // namespace ice_image
 
-#endif
+#endif  // ICE_IMAGE_HPP

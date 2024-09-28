@@ -29,10 +29,10 @@ struct BufferBundle {
                                   types that are supported.
  * @param requested_properties requested properties we want.
  */
-inline std::uint32_t
-find_memory_type_index(const vk::PhysicalDevice physical_device,
-                       std::uint32_t supported_memory_indices,
-                       vk::MemoryPropertyFlags requested_properties) {
+inline std::uint32_t find_memory_type_index(
+    const vk::PhysicalDevice physical_device,
+    std::uint32_t supported_memory_indices,
+    vk::MemoryPropertyFlags requested_properties) {
 #ifndef NDEBUG
   std::cout << "finding memory requirements..." << std::endl;
 #endif
@@ -40,10 +40,10 @@ find_memory_type_index(const vk::PhysicalDevice physical_device,
       physical_device.getMemoryProperties();
 
   for (std::uint32_t i = 0; i < mem_properties.memoryTypeCount; i++) {
-    bool supported{static_cast<bool>(supported_memory_indices &
-                                     (1 << i))}; // supported if set
-    bool sufficient{(mem_properties.memoryTypes[i].propertyFlags &
-                     requested_properties) == requested_properties};
+    const bool supported{static_cast<bool>(supported_memory_indices &
+                                           (1 << i))};  // supported if set
+    const bool sufficient{(mem_properties.memoryTypes[i].propertyFlags &
+                           requested_properties) == requested_properties};
     if (supported && sufficient) {
       return i;
     }
@@ -60,21 +60,21 @@ find_memory_type_index(const vk::PhysicalDevice physical_device,
 // \throws runtime_error is buffer creation fails
 inline BufferBundle create_buffer(const BufferCreationInput &buffer_input) {
   BufferBundle buffer_bundle;
-  vk::BufferCreateInfo buffer_info{
+  const vk::BufferCreateInfo buffer_info{
       .flags = vk::BufferCreateFlags(),
       .size = buffer_input.size,
       .usage = buffer_input.usage,
       .sharingMode = vk::SharingMode::eExclusive,
   };
 
-  // Error handling with nullptr
-  if ((buffer_bundle.buffer = buffer_input.logical_device.createBuffer(
-           buffer_info, nullptr)) == nullptr) {
+  buffer_bundle.buffer =
+      buffer_input.logical_device.createBuffer(buffer_info, nullptr);
+  if (buffer_bundle.buffer == nullptr) {
     throw std::runtime_error("failed to create buffer!");
   }
 
   // Memory requirements
-  vk::MemoryRequirements mem_requirements =
+  const vk::MemoryRequirements mem_requirements =
       buffer_input.logical_device.getBufferMemoryRequirements(
           buffer_bundle.buffer);
 
@@ -85,8 +85,9 @@ inline BufferBundle create_buffer(const BufferCreationInput &buffer_input) {
       buffer_input.physical_device, mem_requirements.memoryTypeBits,
       buffer_input.memory_properties);
 
-  if ((buffer_bundle.buffer_memory = buffer_input.logical_device.allocateMemory(
-           alloc_info, nullptr)) == nullptr) {
+  buffer_bundle.buffer_memory =
+      buffer_input.logical_device.allocateMemory(alloc_info, nullptr);
+  if (buffer_bundle.buffer_memory == nullptr) {
     throw std::runtime_error("failed to allocate vertex buffer memory!");
   }
 
@@ -102,40 +103,39 @@ inline vk::Result copy_buffer(const BufferBundle &src_buffer,
                               BufferBundle &dst_buffer, vk::DeviceSize size,
                               vk::Queue queue,
                               vk::CommandBuffer command_buffer) {
-
   command_buffer.reset();
 
-  vk::CommandBufferBeginInfo begin_info{
+  const vk::CommandBufferBeginInfo begin_info{
       .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit};
   command_buffer.begin(begin_info);
 
-  vk::BufferCopy copy_region{.srcOffset = 0, .dstOffset = 0, .size = size};
+  const vk::BufferCopy copy_region{
+      .srcOffset = 0, .dstOffset = 0, .size = size};
   command_buffer.copyBuffer(src_buffer.buffer, dst_buffer.buffer, 1,
                             &copy_region);
 
   command_buffer.end();
 
-  vk::SubmitInfo submit_info{.commandBufferCount = 1,
-                             .pCommandBuffers = &command_buffer};
+  const vk::SubmitInfo submit_info{.commandBufferCount = 1,
+                                   .pCommandBuffers = &command_buffer};
 
-  vk::Result result = queue.submit(1, &submit_info, nullptr);
+  const vk::Result result = queue.submit(1, &submit_info, nullptr);
   queue.waitIdle();
   return result;
 }
 
 template <typename T>
-inline BufferBundle
-create_device_local_buffer(vk::PhysicalDevice physical_device,
-                           vk::Device device, vk::CommandBuffer command_buffer,
-                           vk::Queue queue, vk::BufferUsageFlagBits usage_bit,
-                           const std::vector<T> &data) {
+inline BufferBundle create_device_local_buffer(
+    vk::PhysicalDevice physical_device, vk::Device device,
+    vk::CommandBuffer command_buffer, vk::Queue queue,
+    vk::BufferUsageFlagBits usage_bit, const std::vector<T> &data) {
   // host local buffer initialization
-  BufferCreationInput buffer_input = {.size = data.size() * sizeof(T),
-                                      .usage =
-                                          vk::BufferUsageFlagBits::eTransferSrc,
-                                      .logical_device = device,
-                                      .physical_device = physical_device};
-  ice::BufferBundle staging_buffer_bundle = ice::create_buffer(buffer_input);
+  BufferCreationInput buffer_input = {
+      .size = data.size() * sizeof(T),
+      .usage = vk::BufferUsageFlagBits::eTransferSrc,
+      .logical_device = device,
+      .physical_device = physical_device};
+  const ice::BufferBundle staging_buffer_bundle = ice::create_buffer(buffer_input);
 
   void *memory_location = device.mapMemory(staging_buffer_bundle.buffer_memory,
                                            0, buffer_input.size);
@@ -148,7 +148,7 @@ create_device_local_buffer(vk::PhysicalDevice physical_device,
   ice::BufferBundle buffer_bundle = create_buffer(buffer_input);
 
   // copy
-  vk::Result result = copy_buffer(staging_buffer_bundle, buffer_bundle,
+  const vk::Result result = copy_buffer(staging_buffer_bundle, buffer_bundle,
                                   buffer_input.size, queue, command_buffer);
   if (result != vk::Result::eSuccess) {
 #ifndef NDEBUG
@@ -163,5 +163,6 @@ create_device_local_buffer(vk::PhysicalDevice physical_device,
 
   return buffer_bundle;
 }
-} // namespace ice
-#endif
+}  // namespace ice
+
+#endif  // DATA_BUFFERS_HPP

@@ -8,7 +8,7 @@
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/type_ptr.hpp>
-#include <glm/gtx/hash.hpp> // for hashing glm::vec data structures
+#include <glm/gtx/hash.hpp>  // for hashing glm::vec data structures
 
 namespace ice {
 
@@ -37,7 +37,7 @@ struct Vertex {
 
     attribute_descriptions[0].location = 0;
 
-    attribute_descriptions[0].format = vk::Format::eR32G32B32Sfloat; // vec3.
+    attribute_descriptions[0].format = vk::Format::eR32G32B32Sfloat;  // vec3.
 
     attribute_descriptions[0].offset = offsetof(Vertex, pos);
 
@@ -50,7 +50,7 @@ struct Vertex {
     // texture attributes
     attribute_descriptions[2].binding = 0;
     attribute_descriptions[2].location = 2;
-    attribute_descriptions[2].format = vk::Format::eR32G32Sfloat; // vec2
+    attribute_descriptions[2].format = vk::Format::eR32G32Sfloat;  // vec2
     attribute_descriptions[2].offset = offsetof(Vertex, tex_coord);
 
     // normal attribute
@@ -60,14 +60,14 @@ struct Vertex {
     attribute_descriptions[3].offset = offsetof(Vertex, normal);
 
 #ifndef NDEBUG
-    std::cout << std::format("\nOffsets:\n"
-                             "pos offset:         {}\n"
-                             "color offset:       {}\n"
-                             "texCoord offset:    {}\n"
-                             "normal offset:      {}\n\n",
-                             offsetof(Vertex, pos), offsetof(Vertex, color),
-                             offsetof(Vertex, tex_coord),
-                             offsetof(Vertex, normal));
+    std::cout << std::format(
+        "\nOffsets:\n"
+        "pos offset:         {}\n"
+        "color offset:       {}\n"
+        "texCoord offset:    {}\n"
+        "normal offset:      {}\n\n",
+        offsetof(Vertex, pos), offsetof(Vertex, color),
+        offsetof(Vertex, tex_coord), offsetof(Vertex, normal));
 #endif
 
     return attribute_descriptions;
@@ -82,15 +82,15 @@ struct Vertex {
 
 // loads mesh data from Obj and corresponding mtl files
 class ObjMesh {
-public:
+ public:
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
   std::vector<glm::vec3> v, vn;
   std::vector<glm::vec2> vt;
   std::unordered_map<std::string, uint32_t> history;
   std::unordered_map<std::string, glm::vec3> color_lookup;
-  glm::vec3 brush_color;
-  glm::mat4 pre_transform;
+  glm::vec3 brush_color{};
+  glm::mat4 pre_transform{};
 
   // Methods
 
@@ -122,14 +122,14 @@ struct MeshBuffer {
 
 // loads mesh data from GLTF, it can represent a whole scene
 class GltfMesh {
-public:
-  GltfMesh() = default; // defers loading
+ public:
+  GltfMesh() = default;  // defers loading
   ~GltfMesh();
 
   GltfMesh(vk::PhysicalDevice physical_device, vk::Device device,
            vk::CommandBuffer command_buffer, vk::Queue queue,
            vk::DescriptorSetLayout descriptor_set_layout,
-           vk::DescriptorPool descriptor_pool, const char *obj_filepath,
+           vk::DescriptorPool descriptor_pool, const char *gltf_filepath,
            glm::mat4 pre_transform);
 
   // new transform to update the mesh with
@@ -143,13 +143,13 @@ public:
 
   std::vector<ice_image::Texture *> textures;
 
-private:
+ private:
   void load(const char *gltf_filepath);
   void bind_models();
   void bind_model_nodes(tinygltf::Node &node,
                         glm::mat4 parent_transform = glm::mat4(1.0f));
   void bind_mesh(tinygltf::Mesh &mesh, const glm::mat4 &global_transform);
-  glm::mat4 get_local_transform(const tinygltf::Node &node);
+  static glm::mat4 get_local_transform(const tinygltf::Node &node);
 
 #ifndef NDEBUG
   void debug_model();
@@ -157,7 +157,7 @@ private:
 
   tinygltf::Model model;
 
-  glm::mat4 pre_transform;
+  glm::mat4 pre_transform{};
   std::string gltf_filepath;
 
   vk::PhysicalDevice physical_device;
@@ -168,12 +168,13 @@ private:
   vk::DescriptorPool descriptor_pool;
 };
 
-} // namespace ice
+}  // namespace ice
 
 // Hash calculation  for Vertex
 // template specialization for std::hash<T>
 namespace std {
-template <> struct hash<ice::Vertex> {
+template <>
+struct hash<ice::Vertex> {
   size_t operator()(ice::Vertex const &vertex) const {
     // uses GLM gtx/hash.hpp hash functions
     return ((hash<glm::vec3>()(vertex.pos) ^
@@ -183,6 +184,6 @@ template <> struct hash<ice::Vertex> {
             (hash<glm::vec3>()(vertex.normal) << 1));
   }
 };
-} // namespace std
+}  // namespace std
 
-#endif
+#endif  // MESH_HPP

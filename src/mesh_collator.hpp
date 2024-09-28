@@ -1,5 +1,5 @@
-#ifndef MESH_COLLATOR
-#define MESH_COLLATOR
+#ifndef MESH_COLLATOR_HPP
+#define MESH_COLLATOR_HPP
 
 #include "config.hpp"
 #include "data_buffers.hpp"
@@ -19,7 +19,7 @@ struct VertexBufferFinalizationInput {
 // stores useful attributes information of these meshes like offsets, vertex
 // count etc.
 class MeshCollator {
-public:
+ public:
   MeshCollator() = default;
   ~MeshCollator();
   // takes in various MeshTypes and adds data concatenate Vertex and indices
@@ -32,13 +32,13 @@ public:
   std::unordered_map<MeshTypes, std::uint32_t> index_lump_offsets;
   std::unordered_map<MeshTypes, std::uint32_t> index_counts;
 
-private:
+ private:
   std::uint32_t index_offset{0};
   vk::Device logical_device;
   std::vector<Vertex> vertex_lump;
   std::vector<std::uint32_t> index_lump;
 };
 
-} // namespace ice
+}  // namespace ice
 
-#endif
+#endif  // MESH_COLLATOR_HPP

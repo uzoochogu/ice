@@ -1,12 +1,12 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "ice_cube_map.hpp"
+
 #include "../data_buffers.hpp"
 #include "../descriptors.hpp"
 
 namespace ice_image {
 
 CubeMap::CubeMap(const TextureCreationInput &input) {
-
   logical_device = input.logical_device;
   physical_device = input.physical_device;
   filenames = input.filenames;
@@ -16,7 +16,7 @@ CubeMap::CubeMap(const TextureCreationInput &input) {
   descriptor_pool = input.descriptor_pool;
 
   // Ensure files are FACES_IN_CUBE in number
-  int number_of_files = static_cast<int>(filenames.size());
+  const int number_of_files = static_cast<int>(filenames.size());
   if (number_of_files < FACES_IN_CUBE) {
 #ifndef NDEBUG
     std::cout << "Inadequate filenames provided, duplicating provided "
@@ -33,7 +33,7 @@ CubeMap::CubeMap(const TextureCreationInput &input) {
 
   load();
 
-  ImageCreationInput image_input{
+  const ImageCreationInput image_input{
       .logical_device = logical_device,
       .physical_device = physical_device,
       .width = static_cast<std::uint32_t>(width),
@@ -55,8 +55,8 @@ CubeMap::CubeMap(const TextureCreationInput &input) {
 
   populate();
 
-  for (int i = 0; i < FACES_IN_CUBE; ++i) {
-    stbi_image_free(pixels[i]);
+  for (auto &pixel : pixels) {
+    stbi_image_free(pixel);
   }
 
   make_view();
@@ -94,17 +94,19 @@ void CubeMap::load() {
           "Empty load in image {},  Allocated random image of size {} x {}\n",
           i, width, height);
 #endif
-      pixels[i] = new stbi_uc[width * height * channels];
-      memset(pixels[i], 255, width * height * channels);
+      pixels[i] =
+          new stbi_uc[static_cast<std::size_t>(width * height * channels)];
+      memset(pixels[i], 255,
+             static_cast<std::size_t>(width * height) * channels);
     }
   }
 }
 
 void CubeMap::populate() {
-  std::uint32_t image_size = width * height * 4;
+  const std::uint32_t image_size = width * height * 4;
   // First create a CPU-visible buffer...
-  ice::BufferCreationInput input{
-      .size = static_cast<size_t>(image_size) * FACES_IN_CUBE,
+  const ice::BufferCreationInput input{
+      .size = static_cast<std::size_t>(image_size) * FACES_IN_CUBE,
       .usage = vk::BufferUsageFlagBits::eTransferSrc,
 
       .memory_properties = vk::MemoryPropertyFlagBits::eHostCoherent |
@@ -112,15 +114,15 @@ void CubeMap::populate() {
 
       .logical_device = logical_device,
       .physical_device = physical_device,
-
   };
 
-  ice::BufferBundle staging_buffer = create_buffer(input);
+  const ice::BufferBundle staging_buffer = create_buffer(input);
 
   // fill all of them
   for (int i = 0; i < FACES_IN_CUBE; ++i) {
     void *write_location = logical_device.mapMemory(
-        staging_buffer.buffer_memory, image_size * i, image_size);
+        staging_buffer.buffer_memory,
+        static_cast<vk::DeviceSize>(image_size) * i, image_size);
     memcpy(write_location, pixels[i], image_size);
     logical_device.unmapMemory(staging_buffer.buffer_memory);
   }
@@ -136,13 +138,13 @@ void CubeMap::populate() {
 
   transition_image_layout(transition_job);
 
-  BufferImageCopyJob copy_job{.command_buffer = command_buffer,
-                              .queue = queue,
-                              .src_buffer = staging_buffer.buffer,
-                              .dst_image = image,
-                              .width = width,
-                              .height = height,
-                              .array_count = FACES_IN_CUBE};
+  const BufferImageCopyJob copy_job{.command_buffer = command_buffer,
+                                    .queue = queue,
+                                    .src_buffer = staging_buffer.buffer,
+                                    .dst_image = image,
+                                    .width = width,
+                                    .height = height,
+                                    .array_count = FACES_IN_CUBE};
 
   copy_buffer_to_image(copy_job);
 
@@ -165,7 +167,7 @@ void CubeMap::make_view() {
 }
 
 void CubeMap::make_sampler() {
-  vk::SamplerCreateInfo sampler_info{
+  const vk::SamplerCreateInfo sampler_info{
       .flags = vk::SamplerCreateFlags(),
       .magFilter = vk::Filter::eLinear,
       .minFilter = vk::Filter::eNearest,
@@ -183,7 +185,7 @@ void CubeMap::make_sampler() {
 
   try {
     sampler = logical_device.createSampler(sampler_info);
-  } catch (vk::SystemError err) {
+  } catch (const vk::SystemError &err) {
 #ifndef NDEBUG
     std::cout << "Failed to make sampler for Cube Map." << std::endl;
 #endif
@@ -194,18 +196,17 @@ void CubeMap::make_sampler() {
 }
 
 void CubeMap::make_descriptor_set() {
-
   descriptor_set =
       ice::allocate_descriptor_sets(logical_device, descriptor_pool, layout);
 
-  vk::DescriptorImageInfo image_descriptor{
+  const vk::DescriptorImageInfo image_descriptor{
       .sampler = sampler,
       .imageView = image_view,
 
       .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
   };
 
-  vk::WriteDescriptorSet descriptor_write{
+  const vk::WriteDescriptorSet descriptor_write{
       .dstSet = descriptor_set,
       .dstBinding = 0,
       .dstArrayElement = 0,
@@ -216,9 +217,10 @@ void CubeMap::make_descriptor_set() {
   logical_device.updateDescriptorSets(descriptor_write, nullptr);
 }
 
-void CubeMap::use(vk::CommandBuffer command_buffer,
-                  vk::PipelineLayout pipelineLayout) {
-  command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                    pipelineLayout, 1, descriptor_set, nullptr);
+void CubeMap::use(vk::CommandBuffer recording_command_buffer,
+                  vk::PipelineLayout pipeline_layout) {
+  recording_command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                              pipeline_layout, 1,
+                                              descriptor_set, nullptr);
 }
-} // namespace ice_image
+}  // namespace ice_image
