@@ -6,8 +6,9 @@
 #include "mesh_collator.hpp"
 
 namespace ice {
-VulkanIce::VulkanIce(IceWindow &window)
+VulkanIce::VulkanIce(IceWindow &window, bool render_points)
     : window{window},
+      render_points{render_points},
       camera{CameraDimensions{.width = 800, .height = 600},
              glm::vec3(6.5f, -6.5f, 5.0f)} {
   make_instance();
@@ -204,7 +205,9 @@ void VulkanIce::make_device() {
   // Pick device features you want
   // sample rate shading can boost frame rate when multisampling is enabled
   const vk::PhysicalDeviceFeatures device_features{
-      .sampleRateShading = vk::True, .samplerAnisotropy = vk::True};
+      .sampleRateShading = vk::True,
+      .fillModeNonSolid = vk::True,
+      .samplerAnisotropy = vk::True};
 
   // Create device
   vk::DeviceCreateInfo device_info{
@@ -340,6 +343,56 @@ void VulkanIce::setup_imgui_overlay() {
   ImGui_ImplVulkan_Init(&init_info);
 }
 
+void VulkanIce::rebuild_pipelines() {
+  try {
+    device.waitIdle();
+  } catch (...) {
+#ifndef NDEBUG
+    std::cout << "Warning: Shutting down engine during operation" << std::endl;
+#endif
+  }
+
+  // Store old handles
+  auto old_pipelines = pipeline;
+  auto old_pipeline_layouts = pipeline_layout;
+  auto old_renderpasses = renderpass;
+  auto old_frames = swapchain_frames;
+  auto old_imgui_renderpass = imgui_renderpass;
+
+  // Create new pipeline structures
+  setup_pipeline_bundles();
+  setup_framebuffers();
+
+  // Clean up old handles after successful creation of new ones
+  for (const PipelineType pipeline_type : pipeline_types) {
+    if (old_pipelines[pipeline_type]) {
+      device.destroyPipeline(old_pipelines[pipeline_type]);
+    }
+    if (old_pipeline_layouts[pipeline_type]) {
+      device.destroyPipelineLayout(old_pipeline_layouts[pipeline_type]);
+    }
+    if (old_renderpasses[pipeline_type]) {
+      device.destroyRenderPass(old_renderpasses[pipeline_type]);
+    }
+  }
+
+  // Clean up old framebuffers and ImGui render pass
+  for (auto &frame : old_frames) {
+    for (const PipelineType pipeline_type : pipeline_types) {
+      if (frame.framebuffer[pipeline_type]) {
+        device.destroyFramebuffer(frame.framebuffer[pipeline_type]);
+      }
+    }
+    if (frame.imgui_framebuffer) {
+      device.destroyFramebuffer(frame.imgui_framebuffer);
+    }
+  }
+
+  if (old_imgui_renderpass) {
+    device.destroyRenderPass(old_imgui_renderpass);
+  }
+}
+
 void VulkanIce::setup_pipeline_bundles() {
   ice::GraphicsPipelineBuilder builder(device);
 
@@ -397,9 +450,9 @@ void VulkanIce::setup_pipeline_bundles() {
                          static_cast<float>(swapchain_extent.height), 0.0f,
                          1.0f})
           .set_scissor(vk::Rect2D({0, 0}, swapchain_extent))
-          .set_rasterization_state(vk::PolygonMode::eFill,
-                                   vk::CullModeFlagBits::eBack,
-                                   vk::FrontFace::eCounterClockwise)
+          .set_rasterization_state(
+              render_points ? vk::PolygonMode::ePoint : vk::PolygonMode::eFill,
+              vk::CullModeFlagBits::eBack, vk::FrontFace::eCounterClockwise)
           .set_multisample_state(msaa_samples)
           .enable_depth_test(true, vk::CompareOp::eLess)
           .disable_blending()
@@ -1185,7 +1238,8 @@ bool VulkanIce::is_device_suitable(const vk::PhysicalDevice &physical_device) {
 #endif
   return indices.is_complete() && extensions_supported && swapchain_adequate &&
          supported_features.samplerAnisotropy &&
-         supported_features.sampleRateShading;
+         supported_features.sampleRateShading &&
+         supported_features.fillModeNonSolid;
 }
 
 /**

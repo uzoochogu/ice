@@ -2,6 +2,7 @@
 #define GAME_OBJECT_HPP
 
 #include "./config.hpp"
+#define GLM_ENABLE_EXPERIMENTAL
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE  // use Vulkan 0.0 to 1.0 not OpenGL's -1
                                      // to 1.0

@@ -113,6 +113,7 @@ void Ice::run() {
 
   // imgui states
   bool show_demo_window = false;
+  bool render_points = false;
   ImGuiIO &io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
@@ -144,6 +145,11 @@ void Ice::run() {
                                             .deviceName.data());
 
       ImGui::Checkbox("Demo Window", &show_demo_window);
+
+      if (ImGui::Checkbox("Render Points", &render_points)) {
+        vulkan_backend.render_points = render_points;
+        vulkan_backend.rebuild_pipelines();
+      }
 
       ImGui::End();
     }
