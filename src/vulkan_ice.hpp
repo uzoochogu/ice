@@ -50,7 +50,7 @@ class VulkanIce {
   vk::DebugUtilsMessengerEXT debug_messenger{nullptr};
 #endif
 
-  explicit VulkanIce(IceWindow &window);
+  explicit VulkanIce(IceWindow &window, bool render_points = false);
   ~VulkanIce() noexcept;
 
   void render(Scene *scene);
@@ -59,6 +59,9 @@ class VulkanIce {
   [[nodiscard]] vk::PhysicalDevice get_physical_device() const {
     return physical_device;
   }
+
+  bool render_points;
+  void rebuild_pipelines();
 
  private:
   // instance setup
