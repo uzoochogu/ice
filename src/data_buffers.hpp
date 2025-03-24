@@ -135,7 +135,8 @@ inline BufferBundle create_device_local_buffer(
       .usage = vk::BufferUsageFlagBits::eTransferSrc,
       .logical_device = device,
       .physical_device = physical_device};
-  const ice::BufferBundle staging_buffer_bundle = ice::create_buffer(buffer_input);
+  const ice::BufferBundle staging_buffer_bundle =
+      ice::create_buffer(buffer_input);
 
   void *memory_location = device.mapMemory(staging_buffer_bundle.buffer_memory,
                                            0, buffer_input.size);
@@ -148,8 +149,9 @@ inline BufferBundle create_device_local_buffer(
   ice::BufferBundle buffer_bundle = create_buffer(buffer_input);
 
   // copy
-  const vk::Result result = copy_buffer(staging_buffer_bundle, buffer_bundle,
-                                  buffer_input.size, queue, command_buffer);
+  const vk::Result result =
+      copy_buffer(staging_buffer_bundle, buffer_bundle, buffer_input.size,
+                  queue, command_buffer);
   if (result != vk::Result::eSuccess) {
 #ifndef NDEBUG
     std::cerr << std::format("{} copy operation creation failed!\n",
