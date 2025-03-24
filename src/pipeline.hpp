@@ -55,7 +55,8 @@ class GraphicsPipelineBuilder {
 
   GraphicsPipelineBuilder& set_rasterization_state(vk::PolygonMode polygon_mode,
                                                    vk::CullModeFlags cull_mode,
-                                                   vk::FrontFace front_face);
+                                                   vk::FrontFace front_face,
+                                                   float line_width = 1.0f);
 
   GraphicsPipelineBuilder& set_multisample_state(
       vk::SampleCountFlagBits samples);

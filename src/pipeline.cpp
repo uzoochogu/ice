@@ -93,14 +93,14 @@ GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_scissor(
 
 GraphicsPipelineBuilder& GraphicsPipelineBuilder::set_rasterization_state(
     vk::PolygonMode polygon_mode, vk::CullModeFlags cull_mode,
-    vk::FrontFace front_face) {
+    vk::FrontFace front_face, float line_width) {
   rasterization_state_.polygonMode = polygon_mode;
   rasterization_state_.cullMode = cull_mode;
   rasterization_state_.frontFace = front_face;
   rasterization_state_.depthClampEnable = vk::False;
   rasterization_state_.rasterizerDiscardEnable = vk::False;
   rasterization_state_.depthBiasEnable = vk::False;
-  rasterization_state_.lineWidth = 1.0f;
+  rasterization_state_.lineWidth = line_width;
 
   config_flags_ |= ConfigFlags::RASTERIZATION;
   return *this;

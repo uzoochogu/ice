@@ -3,7 +3,6 @@
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 
-
 namespace ice {
 
 Camera::Camera(CameraDimensions dim, glm::vec3 position)

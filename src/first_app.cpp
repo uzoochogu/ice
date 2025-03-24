@@ -2,7 +2,6 @@
 
 #include "ice.hpp"
 
-
 int main() {
   ice::Ice block;
 

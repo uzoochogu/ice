@@ -2,7 +2,10 @@
 
 #include <imgui.h>
 
+#include <array>
 #include <sstream>
+
+#include "ui_compatibility.hpp"
 
 namespace ice {
 
@@ -114,9 +117,31 @@ void Ice::run() {
   // imgui states
   bool show_demo_window = false;
   bool render_points = false;
+
+  bool render_wireframe = vulkan_backend.render_wireframe;
+
+  auto msaa_options = std::to_array<const char *>(
+      {"1x - (Not ideal)", "2x", "4x", "8x", "16x"});
+  static int msaa_current = 3;  // Default to 8x
+
+  auto cull_options =
+      std::to_array<const char *>({"None", "Front", "Back", "Front & Back"});
+  static int cull_current = 2;  // Default to Back
+
+  bool show_skybox = true;
+  bool skybox = vulkan_backend.show_skybox;
+
   ImGuiIO &io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+
+  // // Pipeline config struct
+  // struct PipelineConfig{
+  //   // Render points
+  //   // Primitive type?
+  //   // Render mode
+  //   //
+  // } config{};
 
   while (!window.should_close()) {
     ice::IceWindow::poll_events();
@@ -149,6 +174,34 @@ void Ice::run() {
       if (ImGui::Checkbox("Render Points", &render_points)) {
         vulkan_backend.render_points = render_points;
         vulkan_backend.rebuild_pipelines();
+      }
+      if (ImGui::Checkbox("Wireframe Mode", &render_wireframe)) {
+        vulkan_backend.render_wireframe = render_wireframe;
+        vulkan_backend.rebuild_pipelines();
+      }
+
+      if (ImGui::Combo("MSAA Samples", &msaa_current, msaa_options.data(),
+                       msaa_options.size())) {
+        msaa_current =
+            ui_compatibility::set_msaa_samples(vulkan_backend, msaa_current);
+      }
+
+      if (ImGui::Combo("Culling Mode", &cull_current, cull_options.data(),
+                       cull_options.size())) {
+        cull_current =
+            ui_compatibility::set_cull_mode(vulkan_backend, cull_current);
+      }
+
+      if (ImGui::Checkbox("Show Skybox", &skybox)) {
+        // vulkan_backend.show_skybox = skybox;
+        vulkan_backend.toggle_skybox(skybox);
+      }
+
+      if (vulkan_backend.render_wireframe) {
+        float width = vulkan_backend.line_width;
+        if (ImGui::SliderFloat("Line Width", &width, 1.0f, 10.0f)) {
+          vulkan_backend.set_line_width(width);
+        }
       }
 
       ImGui::End();

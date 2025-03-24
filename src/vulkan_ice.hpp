@@ -50,7 +50,7 @@ class VulkanIce {
   vk::DebugUtilsMessengerEXT debug_messenger{nullptr};
 #endif
 
-  explicit VulkanIce(IceWindow &window, bool render_points = false);
+  explicit VulkanIce(IceWindow &window);
   ~VulkanIce() noexcept;
 
   void render(Scene *scene);
@@ -60,8 +60,19 @@ class VulkanIce {
     return physical_device;
   }
 
-  bool render_points;
+  // UI settable states with setters
+  bool render_points = false;
+  bool render_wireframe = false;
+  bool show_skybox = true;
+  float line_width = 1.0f;
+  vk::CullModeFlagBits cull_mode = vk::CullModeFlagBits::eBack;
   void rebuild_pipelines();
+  void set_msaa_samples(vk::SampleCountFlagBits samples);
+  void set_cull_mode(vk::CullModeFlagBits mode);
+  void toggle_skybox(bool button);
+  void set_line_width(float width);
+
+  vk::SampleCountFlagBits get_max_sample_count();  // for MSAA support
 
  private:
   // instance setup
@@ -71,7 +82,7 @@ class VulkanIce {
   void make_device();
   void setup_pipeline_bundles();
   void setup_swapchain(vk::SwapchainKHR *old_swapchain = nullptr);
-  void recreate_swapchain();
+  void recreate_swapchain(bool recreate_pipelines = false);
 
   void setup_descriptor_set_layouts();
 
@@ -105,7 +116,6 @@ class VulkanIce {
   bool check_device_extension_support(
       const vk::PhysicalDevice &physical_device);
   bool is_device_suitable(const vk::PhysicalDevice &physical_device);
-  vk::SampleCountFlagBits get_max_sample_count();  // for MSAA support
 
   // useful data
   QueueFamilyIndices indices;

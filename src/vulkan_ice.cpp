@@ -6,9 +6,8 @@
 #include "mesh_collator.hpp"
 
 namespace ice {
-VulkanIce::VulkanIce(IceWindow &window, bool render_points)
+VulkanIce::VulkanIce(IceWindow &window)
     : window{window},
-      render_points{render_points},
       camera{CameraDimensions{.width = 800, .height = 600},
              glm::vec3(6.5f, -6.5f, 5.0f)} {
   make_instance();
@@ -29,6 +28,16 @@ VulkanIce::VulkanIce(IceWindow &window, bool render_points)
 #endif
 
   // swapchain, format, extent, msaa_samples
+  vk::SampleCountFlagBits max_sample_count = get_max_sample_count();
+  msaa_samples =
+      std::min(max_sample_count,
+               vk::SampleCountFlagBits::e8);  // capped at 8 BIT for now
+#ifndef NDEBUG
+  std::cout << std::format("Max MSAA samples: {}\nChosen MSAA samples: {}",
+                           vk::to_string(max_sample_count),
+                           vk::to_string(msaa_samples))
+            << std::endl;
+#endif
   setup_swapchain(nullptr);
 
   setup_descriptor_set_layouts();
@@ -207,6 +216,7 @@ void VulkanIce::make_device() {
   const vk::PhysicalDeviceFeatures device_features{
       .sampleRateShading = vk::True,
       .fillModeNonSolid = vk::True,
+      .wideLines = vk::True,
       .samplerAnisotropy = vk::True};
 
   // Create device
@@ -238,15 +248,6 @@ void VulkanIce::make_device() {
 }
 
 void VulkanIce::setup_swapchain(vk::SwapchainKHR *old_swapchain) {
-  msaa_samples =
-      std::min(get_max_sample_count(),
-               vk::SampleCountFlagBits::e8);  // capped at 8 BIT for now
-#ifndef NDEBUG
-  std::cout << std::format("Max MSAA samples: {}\nChosen MSAA samples: {}",
-                           vk::to_string(get_max_sample_count()),
-                           vk::to_string(msaa_samples))
-            << std::endl;
-#endif
   // swapchain creation
   SwapChainBundle bundle = create_swapchain_bundle(
       physical_device, device, surface, window.get_framebuffer_size().width,
@@ -393,6 +394,33 @@ void VulkanIce::rebuild_pipelines() {
   }
 }
 
+void VulkanIce::set_msaa_samples(vk::SampleCountFlagBits samples) {
+  msaa_samples = samples;
+  recreate_swapchain(true);
+#ifndef NDEBUG
+  std::cout << "Rebuilt the swapchain and pipelines to change msaa samples!"
+            << std::endl;
+#endif
+}
+
+void VulkanIce::set_cull_mode(vk::CullModeFlagBits mode) {
+  cull_mode = mode;
+  rebuild_pipelines();
+#ifndef NDEBUG
+  std::cout << "Rebuilt the pipelines to change culling mode!" << std::endl;
+#endif
+}
+
+void VulkanIce::toggle_skybox(bool button) {
+  show_skybox = button;
+  rebuild_pipelines();
+#ifndef NDEBUG
+  std::cout << "Rebuilt the pipelines to toggle skybox" << std::endl;
+#endif
+}
+
+void VulkanIce::set_line_width(float width) { line_width = width; }
+
 void VulkanIce::setup_pipeline_bundles() {
   ice::GraphicsPipelineBuilder builder(device);
 
@@ -431,11 +459,13 @@ void VulkanIce::setup_pipeline_bundles() {
           .build();
   pipeline[PipelineType::SKY] = sky_pipeline;
 
+  vk::AttachmentLoadOp load_op =
+      show_skybox ? vk::AttachmentLoadOp::eLoad : vk::AttachmentLoadOp::eClear;
+
   // STANDARD PIPELINE
   renderpass[PipelineType::STANDARD] = make_scene_renderpass(
-      device, swapchain_format, swapchain_frames[0].depth_format,
-      vk::AttachmentLoadOp::eLoad, vk::ImageLayout::eColorAttachmentOptimal,
-      msaa_samples);
+      device, swapchain_format, swapchain_frames[0].depth_format, load_op,
+      vk::ImageLayout::eColorAttachmentOptimal, msaa_samples);
   pipeline_layout[PipelineType::STANDARD] =
       make_pipeline_layout(device, {frame_set_layout[PipelineType::STANDARD],
                                     mesh_set_layout[PipelineType::STANDARD]});
@@ -451,13 +481,21 @@ void VulkanIce::setup_pipeline_bundles() {
                          1.0f})
           .set_scissor(vk::Rect2D({0, 0}, swapchain_extent))
           .set_rasterization_state(
-              render_points ? vk::PolygonMode::ePoint : vk::PolygonMode::eFill,
-              vk::CullModeFlagBits::eBack, vk::FrontFace::eCounterClockwise)
+              render_points ? vk::PolygonMode::ePoint
+                            : (render_wireframe ? vk::PolygonMode::eLine
+                                                : vk::PolygonMode::eFill),
+              cull_mode, vk::FrontFace::eCounterClockwise, 1.0f)
           .set_multisample_state(msaa_samples)
           .enable_depth_test(true, vk::CompareOp::eLess)
           .disable_blending()
           .set_dynamic_state(
-              {vk::DynamicState::eViewport, vk::DynamicState::eScissor})
+              render_wireframe
+                  ? std::vector<vk::DynamicState>{vk::DynamicState::eViewport,
+                                                  vk::DynamicState::eScissor,
+                                                  vk::DynamicState::eLineWidth,
+                                                  vk::DynamicState::eCullMode}
+                  : std::vector<vk::DynamicState>{vk::DynamicState::eViewport,
+                                                  vk::DynamicState::eScissor})
           .set_pipeline_layout(pipeline_layout[PipelineType::STANDARD])
           .set_render_pass(renderpass[PipelineType::STANDARD])
           .build();
@@ -476,7 +514,7 @@ void VulkanIce::setup_framebuffers() {
 
   // populate frame buffers (including imgui's), one for each
   // swapchain image.
-  make_framebuffers(framebuffer_input, swapchain_frames);
+  ice::make_framebuffers(framebuffer_input, swapchain_frames);
 }
 
 // Creates a command pool, the main command buffer and a command buffer for each
@@ -522,7 +560,7 @@ void VulkanIce::setup_frame_resources() {
   }
 }
 
-void VulkanIce::recreate_swapchain() {
+void VulkanIce::recreate_swapchain(bool recreate_pipeline) {
 #ifndef NDEBUG
   std::cout << "Recreating swapchain\n";
 #endif
@@ -559,7 +597,14 @@ void VulkanIce::recreate_swapchain() {
   std::cout << "Destroyed old swapchain" << std::endl;
 #endif
 
-  setup_framebuffers();
+  if (recreate_pipeline) {
+    rebuild_pipelines();
+  } else {
+    // rebuild_pipelines() creates framebuffers
+    setup_framebuffers();
+  }
+
+  // setup_framebuffers();
   setup_frame_resources();
   // just setup frame command buffers, since pool and main buffer
   // is already created
@@ -891,7 +936,9 @@ void VulkanIce::render(Scene *scene) {
     throw std::runtime_error("Failed to begin recording command buffer!");
   }
   // record events
-  record_sky_draw_commands(command_buffer, acquired_image_index);
+  if (show_skybox) {
+    record_sky_draw_commands(command_buffer, acquired_image_index);
+  }
   record_scene_draw_commands(command_buffer, acquired_image_index, scene);
 
   // end
@@ -1082,6 +1129,10 @@ void VulkanIce::record_scene_draw_commands(vk::CommandBuffer command_buffer,
   const vk::Rect2D scissor{.offset = {0, 0}, .extent = swapchain_extent};
   command_buffer.setScissor(0, 1, &scissor);
 
+  if (render_wireframe) {
+    command_buffer.setLineWidth(line_width);
+  }
+
   command_buffer.bindDescriptorSets(
       vk::PipelineBindPoint::eGraphics, pipeline_layout[PipelineType::STANDARD],
       0, swapchain_frames[image_index].descriptor_sets[PipelineType::STANDARD],
@@ -1239,7 +1290,7 @@ bool VulkanIce::is_device_suitable(const vk::PhysicalDevice &physical_device) {
   return indices.is_complete() && extensions_supported && swapchain_adequate &&
          supported_features.samplerAnisotropy &&
          supported_features.sampleRateShading &&
-         supported_features.fillModeNonSolid;
+         supported_features.fillModeNonSolid && supported_features.wideLines;
 }
 
 /**
