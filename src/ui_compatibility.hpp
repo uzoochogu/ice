@@ -60,10 +60,10 @@ inline int set_cull_mode(ice::VulkanIce& backend, int cull_current) {
       cull_mode = vk::CullModeFlagBits::eNone;
       break;
     case 1:
-      cull_mode = vk::CullModeFlagBits::eBack;
+      cull_mode = vk::CullModeFlagBits::eFront;
       break;
     case 2:
-      cull_mode = vk::CullModeFlagBits::eFront;
+      cull_mode = vk::CullModeFlagBits::eBack;
       break;
     case 3:
       cull_mode = vk::CullModeFlagBits::eFrontAndBack;
