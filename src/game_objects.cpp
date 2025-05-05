@@ -7,17 +7,14 @@ Scene::Scene() {
   positions.insert({MeshTypes::GIRL, {}});
   positions.insert({MeshTypes::SKULL, {}});
 
-  // One ground and girl, 2 skulls
+  // One ground and girl, 2 skulls model transforms
 
-  // model transform
-  // glm::vec3 {distance away from cam, left/right of cam, height above cam
-  // level}
-
-  // Ground is pushed forward in front of the camera, dead centre with the cam,
-  // and on the ground i.e height of zero
-  positions[MeshTypes::GROUND].emplace_back(10.0f, 0.0f, 0.0f);
-  positions[MeshTypes::GIRL].emplace_back(17.0f, 0.0f, 0.0f);
-  positions[MeshTypes::SKULL].emplace_back(15.0f, -5.0f, 1.0f);
-  positions[MeshTypes::SKULL].emplace_back(15.0f, 5.0f, 1.0f);
+  // Coordinate system from GLM (OpenGL) Left handed from Model's perspective
+  // Camera's perspective: right is (-x), up is (+y),
+  // forward into screen is (+z),
+  positions[MeshTypes::GROUND].emplace_back(0.0f, 0.0f, 0.0f);
+  positions[MeshTypes::GIRL].emplace_back(0.0f, 0.0f, 0.0f);
+  positions[MeshTypes::SKULL].emplace_back(-5.0f, 3.0f, 1.0f);
+  positions[MeshTypes::SKULL].emplace_back(5.0f, 3.0f, 1.0f);
 }
 }  // namespace ice
