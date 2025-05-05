@@ -9,7 +9,7 @@ namespace ice {
 VulkanIce::VulkanIce(IceWindow &window)
     : window{window},
       camera{CameraDimensions{.width = 800, .height = 600},
-             glm::vec3(6.5f, -6.5f, 5.0f)} {
+             glm::vec3(3.0f, 9.0f, -16.0f)} {
   make_instance();
 
   // create surface, connect to vulkan
@@ -426,7 +426,7 @@ void VulkanIce::setup_pipeline_bundles() {
 
   // SKY PIPELINE
   renderpass[PipelineType::SKY] = make_sky_renderpass(
-      device, swapchain_format, vk::AttachmentLoadOp::eDontCare,
+      device, swapchain_format, vk::AttachmentLoadOp::eClear,
       vk::ImageLayout::eUndefined, msaa_samples);
 
   pipeline_layout[PipelineType::SKY] =
@@ -638,21 +638,31 @@ void VulkanIce::make_assets() {
   meshes = std::make_unique<MeshCollator>();
   // meshes = new MeshCollator();
 
+  // Coordinate system from GLM (OpenGL) Left handed from Model's perspective
+  // Camera's perspective: right is (-x), up is (+y),
+  // forward into screen is (+z),
+
   // <mesh type , filenames, pre_transforms> prep
   const std::vector<std::tuple<MeshTypes, std::vector<const char *>, glm::mat4>>
       model_inputs = {
           {MeshTypes::GROUND,
            /* obj file path, material file path*/
            {"resources/models/ground.obj", "resources/models/ground.mtl"},
-           glm::mat4(1.0f)},
-          /* Rotate 180 degrees about the z axis*/
+           // Rotate 270 degrees around x-axis
+           glm::rotate(glm::mat4(1.0f), glm::radians(270.0f),
+                       glm::vec3(1.0f, 0.0f, 0.0f))},
+          /* Rotate 90 degrees about the y axis, then -90 degrees about x */
           {MeshTypes::GIRL,
            {"resources/models/girl.obj", "resources/models/girl.mtl"},
-           glm::rotate(glm::mat4(1.0f), glm::radians(180.0f),
-                       glm::vec3(0.0f, 0.0f, 1.0f))},
+           glm::rotate(glm::rotate(glm::mat4(1.0f), glm::radians(90.0f),
+                                   glm::vec3(0.0f, 1.0f, 0.0f)),
+                       glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f))},
+          /* Rotate -90 degrees about the z axis, then -90 degrees about y */
           {MeshTypes::SKULL,
            {"resources/models/skull.obj", "resources/models/skull.mtl"},
-           glm::mat4(1.0f)}};
+           glm::rotate(glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f),
+                                   glm::vec3(0.0f, 0.0f, 1.0f)),
+                       glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f))}};
 
   // stores models to be loaded
   std::unordered_map<MeshTypes, ObjMesh> models;
@@ -746,19 +756,30 @@ void VulkanIce::make_assets() {
   std::cout << std::format("Mesh loading took {} seconds",
                            elapsed_seconds.count())
             << std::endl;
+  start = std::chrono::high_resolution_clock::now();
 #endif
 
   // Sky Texture
   texture_info.layout = mesh_set_layout[PipelineType::SKY];
   texture_info.filenames = {{
+      // This arrangement correctly formats skyboxes authored for OpenGL
       "resources/textures/sky_front.png",   // x+
       "resources/textures/sky_back.png",    // x-
-      "resources/textures/sky_left.png",    // y+
-      "resources/textures/sky_right.png",   // y-
-      "resources/textures/sky_bottom.png",  // z+
-      "resources/textures/sky_top.png",     // z-
+      "resources/textures/sky_top.png",     // y+
+      "resources/textures/sky_bottom.png",  // y-
+      "resources/textures/sky_right.png",   // z-
+      "resources/textures/sky_left.png",    // z+
   }};
   cube_map = std::make_unique<ice_image::CubeMap>(texture_info);
+
+#ifndef NDEBUG
+  end = std::chrono::high_resolution_clock::now();
+  elapsed_seconds = end - start;
+  std::cout << std::format("Cubemap textures loading took {} seconds\n\n",
+                           elapsed_seconds.count())
+            << std::endl;
+  start = std::chrono::high_resolution_clock::now();
+#endif
 
   // GltfMesh
   // Create a larger descriptor pool for GLTF mesh textures
@@ -772,12 +793,22 @@ void VulkanIce::make_assets() {
   const vk::DescriptorPool gltf_descriptor_pool =
       make_descriptor_pool(device, 1000, gltf_texture_layout_bindings);
 
+  /*
+   * GLTF coordinate system (from cam's perspective): right of cam is (+x), up
+   * (+y), +z is forwards (out of the screen/towards the cam)
+   */
   // TRS
   glm::mat4 pre_transform =
-      glm::translate(glm::mat4(1.0f), glm::vec3(15.0f, 3.0f, 5.0f));
+      glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 10.0f, 5.0f));
 
-  pre_transform = glm::rotate(pre_transform, glm::radians(120.0f),
-                              glm::vec3(1.0f, 1.0f, 1.0f));
+  pre_transform = glm::rotate(pre_transform, glm::radians(180.0f),
+                              glm::vec3(0.0f, 1.0f, 0.0f));
+  pre_transform = glm::rotate(pre_transform, glm::radians(-180.0f),
+                              glm::vec3(1.0f, 0.0f, 0.0f));
+
+  pre_transform = glm::rotate(pre_transform, glm::radians(180.0f),
+                              glm::vec3(0.0f, 0.0f, 1.0f));
+
   pre_transform = glm::rotate(pre_transform, glm::radians(180.0f),
                               glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -1050,6 +1081,8 @@ void VulkanIce::render_mesh(vk::CommandBuffer command_buffer,
 
 void VulkanIce::record_sky_draw_commands(vk::CommandBuffer command_buffer,
                                          uint32_t image_index) {
+  const vk::ClearValue clear_color = vk::ClearColorValue({std::array<float, 4>{
+      0.94f, 0.35f, 0.54f, 1.0f}});  // pink rgb(240, 89, 139)
   const vk::RenderPassBeginInfo renderpass_info = {
       .renderPass = renderpass[PipelineType::SKY],
       .framebuffer =
@@ -1057,7 +1090,10 @@ void VulkanIce::record_sky_draw_commands(vk::CommandBuffer command_buffer,
       .renderArea{
           .offset{.x = 0, .y = 0},
           .extent = swapchain_extent,
-      }};
+      },
+      .clearValueCount = 1,
+      .pClearValues = &clear_color,
+  };
 
   command_buffer.beginRenderPass(&renderpass_info,
                                  vk::SubpassContents::eInline);
@@ -1092,8 +1128,8 @@ void VulkanIce::record_sky_draw_commands(vk::CommandBuffer command_buffer,
 void VulkanIce::record_scene_draw_commands(vk::CommandBuffer command_buffer,
                                            uint32_t image_index, Scene *scene) {
   // clear values unions
-  const vk::ClearValue clear_color =
-      vk::ClearColorValue({std::array<float, 4>{1.0f, 0.5f, 0.25f, 1.0f}});
+  const vk::ClearValue clear_color = vk::ClearColorValue({std::array<float, 4>{
+      1.0f, 0.5f, 0.25f, 1.0f}});  // cream rgb(255, 188, 137)
   const vk::ClearValue clear_depth = vk::ClearDepthStencilValue({1.0f, 0});
 
   std::vector<vk::ClearValue> clear_values = {{clear_color, clear_depth}};

@@ -22,9 +22,23 @@ void Camera::update_matrices(float FOV_deg, float near_plane, float far_plane) {
       glm::perspective(glm::radians(FOV_deg),
                        static_cast<float>(width) / static_cast<float>(height),
                        near_plane, far_plane);
-  // correct to Vulkan coordinate system
-  camera_matrix.projection[1][1] *= -1;
+  camera_matrix.projection[1][1] *= -1;  // correct to Vulkan coordinate system
   camera_matrix.view_projection = camera_matrix.projection * camera_matrix.view;
+
+  // Update camera_vector
+  camera_vector.forwards = glm::vec4(glm::normalize(orientation), 0.0f);
+  camera_vector.right =
+      glm::vec4(glm::normalize(glm::cross(orientation, up)), 0.0f);
+  // maintain orthogonality
+  camera_vector.up =
+      glm::vec4(glm::normalize(glm::cross(glm::vec3(camera_vector.right),
+                                          glm::vec3(camera_vector.forwards))),
+                0.0f);
+  camera_vector.tanHalfFovY =
+      -1.0f /
+      camera_matrix.projection[1][1];  // use original y axis, tan(fovY * 0.5);
+  camera_vector.tanHalfFovX =
+      1.0f / camera_matrix.projection[0][0];  // tanHalfFovY * aspectRatio;
 }
 
 void Camera::inputs(IceWindow *ice_window) {
@@ -40,8 +54,8 @@ void Camera::inputs(IceWindow *ice_window) {
   if (glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS) {
     // Resets to origin
     position = DEFAULT_POSITION;
-    orientation = glm::vec3(2.0f, 1.0f, 0.0f);
-    up = {0.0f, 0.0f, 1.0f};
+    orientation = glm::vec3(0.0f, 0.0f, 1.0f);  // Forward along +Z
+    up = glm::vec3(0.0f, 1.0f, 0.0f);           // Up along -Y
     speed = default_speed = 0.005f;
     sensitivity = 5.0f;
   }
@@ -81,6 +95,26 @@ void Camera::inputs(IceWindow *ice_window) {
                        speed, sensitivity, glm::to_string(camera_matrix.view),
                        glm::to_string(camera_matrix.projection),
                        glm::to_string(camera_matrix.projection))
+                << std::endl;
+      // Camera vectors
+      std::cout << std::format(
+                       "Camera Vectors:\n"
+                       "  Forward: {}\n"
+                       "  Right: {}\n"
+                       "  Up: {}\n"
+                       "  Orthogonality check:\n"
+                       "    Forward·Right: {} (should be ~0)\n"
+                       "    Forward·Up: {} (should be ~0)\n"
+                       "    Right·Up: {} (should be ~0)\n",
+                       glm::to_string(camera_vector.forwards),
+                       glm::to_string(camera_vector.right),
+                       glm::to_string(camera_vector.up),
+                       glm::dot(glm::vec3(camera_vector.forwards),
+                                glm::vec3(camera_vector.right)),
+                       glm::dot(glm::vec3(camera_vector.forwards),
+                                glm::vec3(camera_vector.up)),
+                       glm::dot(glm::vec3(camera_vector.right),
+                                glm::vec3(camera_vector.up)))
                 << std::endl;
     }
   }

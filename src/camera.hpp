@@ -1,6 +1,8 @@
 #ifndef CAMERA_HPP
 #define CAMERA_HPP
 
+#include <cmath>
+
 #include "game_objects.hpp"
 #include "windowing.hpp"
 
@@ -19,6 +21,8 @@ struct CameraVectors {
   glm::vec4 forwards;
   glm::vec4 right;
   glm::vec4 up;
+  float tanHalfFovY;
+  float tanHalfFovX;
 };
 
 struct CameraDimensions {
@@ -44,14 +48,23 @@ class Camera {
 
  private:
   CameraMatrices camera_matrix;
-  CameraVectors camera_vector{glm::vec4({1.0f, 0.0f, 0.0f, 0.0f}),
-                              glm::vec4({0.0f, -1.0f, 0.0f, 0.0f}),
-                              glm::vec4({0.0f, 0.0f, 1.0f, 0.0f})};
+  CameraVectors camera_vector{
+      .forwards = glm::vec4({0.0f, 0.0f, 1.0f, 0.0f}),
+      .right = glm::vec4({1.0f, 0.0f, 0.0f, 0.0f}),
+      .up = glm::vec4({0.0f, 1.0f, 0.0f, 0.0f}),
+
+      .tanHalfFovY = std::tanf(45.0 * 0.5),
+      .tanHalfFovX =
+          std::tanf(45.0 * 0.5) *
+          static_cast<float>(800.0 /
+                             600.0)};  // using 45 degree and 800/600 as default
+
   // Stores the main vectors of the camera
   glm::vec3 position;
   const glm::vec3 DEFAULT_POSITION;
-  glm::vec3 orientation = glm::vec3(2.0f, 1.0f, 0.0f);
-  glm::vec3 up = {0.0f, 0.0f, 1.0f};
+  glm::vec3 orientation = glm::vec3(0.0f, 0.0f, 1.0f);  // Forward along +Z
+  glm::vec3 up =
+      glm::vec3(0.0f, 1.0f, 0.0f);  // Up along -Y (Note Vulkan Y is down)
 
   // Prevents the camera from jumping around when first clicking left click
   bool first_click{true}, camera_active{false};
