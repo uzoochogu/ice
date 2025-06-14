@@ -57,29 +57,14 @@ if(MSVC)
   set_target_properties(
     ${vulkan_apps} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:${vulkan_apps}>/" 
   )
+endif()
 
-  # Copy compiled shaders to executable directory
-  # Add post-build commands
-  add_custom_command(TARGET ${vulkan_apps} POST_BUILD
+# Copy compiled shaders to executable directory
+# Add post-build commands
+add_custom_command(TARGET ${vulkan_apps} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/resources
-        "$(TargetDir)resources" COMMENT
-        "copied resource folder from ${source} => $(TargetDir)resources"
-  )
-elseif(UNIX)
-  # For non-MSVC (Linux, macOS, etc.)
-  add_custom_command(TARGET ${vulkan_apps}
-  COMMAND ${CMAKE_COMMAND} -E create_symlink
-  ${source} ${destination} DEPENDS ${
-    destination} COMMENT
-  "symbolic link resource folder from ${source} => ${destination}"
-  )
-else()
-  # windows might not use MSVC
-  add_custom_command(TARGET ${vulkan_apps} POST_BUILD
-  COMMAND ${CMAKE_COMMAND} -E copy_directory
-      ${source}
-      ${destination} COMMENT
-      "copied resource folder from ${source} => ${destination}"
-  )
-endif() 
+        ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>/resources COMMENT
+        "copied resource folder from ${source} to ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>"
+        VERBATIM
+)
